@@ -438,6 +438,11 @@ body.disclaimer-hidden .chat-drawer {
   right: 24px;
   width: 380px;
   max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 92px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #94A3B8 transparent;
   background: #EEF2F9;
   border: 1px solid #CBD5E1;
   border-radius: 28px;
@@ -632,8 +637,15 @@ body.disclaimer-hidden .chat-drawer {
 }
 
 .popover-footer-actions {
+  position: sticky;
+  bottom: -16px;
+  background: #EEF2F9;
+  padding: 10px 0 4px;
+  margin-bottom: -8px;
+  border-top: 1px solid #CBD5E1;
   display: flex;
   gap: 8px;
+  z-index: 2;
 }
 
 .btn-popover-add-account {
