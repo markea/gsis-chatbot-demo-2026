@@ -356,10 +356,31 @@ sequenceDiagram
 
 ### 10.2 Dual-Mode AlloyDB & Cloud Run Persistence Resilience (`NFR-DATA-01`)
 * **Dual-Mode AlloyDB Connector:** The Mock MCP Server and RAG Service shall implement a **Dual-Mode Database Adapter**:
-  * **Primary Mode:** Connects directly to **AlloyDB for PostgreSQL (`pgvector` + relational tables)** when `ALLOYDB_URI` is configured in Google Cloud Run.
-  * **Zero-Downtime Demo Fallback Mode:** Automatically falls back to an embedded/local PostgreSQL-compatible persistence engine on Cloud Run if the AlloyDB cluster is paused between executive demos to optimize cloud spend, guaranteeing **99.95% demo availability** and `<1.5s` cold-start readiness at all times.
+  * **Primary Mode:** Connects directly to **AlloyDB for PostgreSQL (`pgvector` + relational tables)** when `DATABASE_URL` / `ALLOYDB_URI` is configured in Google Cloud Run.
+  * **Zero-Downtime Embedded Demo Fallback Mode (`SQLite 3 + In-Memory RAG`):** Automatically runs an embedded **SQLite 3** relational database (`/tmp/gsis_demo.db` in Cloud Run's high-speed in-memory `tmpfs`) paired with an **In-Memory Vector/Keyword RAG Corpus** (`18` official GSIS policies) when `DATABASE_URL` is unset, guaranteeing **$0.00/month idle database cost**, `scale-to-zero` Cloud Run efficiency, **99.95% demo availability**, and `<1.5s` cold-start readiness at all times.
 
-### 10.3 Defense-in-Depth AI Security: Google Cloud Model Armor & RA 10173 (`NFR-SEC`)
+### 10.3 Post-Deployment Executive Demo UX & Conversational Refinements (`FR-UX-02` to `FR-UX-05`)
+Following initial Cloud Run deployment and interactive testing, the following executive UX and conversational requirements were standardized into the baseline product specification:
+
+* **FR-UX-02 (Collapsible Demo Disclaimer Bar & Draggable Floating `⚠️ STRICTLY DEMO ONLY` Pill Badge):**
+  * The top `⚠️ STRICTLY DEMO ONLY — GSIS GABAY AI EXECUTIVE PROTOTYPE` banner shall include a **`Hide ▲`** toggle button that collapses the full-width top bar to maximize vertical screen real estate.
+  * When the top disclaimer bar is collapsed, a floating **`⚠️ STRICTLY DEMO ONLY · Show Banner ▲`** pill badge (`#floatingDemoPill`) shall appear at the bottom-left of the viewport.
+  * To ensure the floating pill never obstructs the chatbot input field or portal controls on smaller viewports, the pill badge shall support **Pointer-Events drag-and-drop repositioning** (`⋮⋮` grip handle) with viewport boundary clamping and `localStorage` coordinate persistence (`gsis_demo_pill_pos`), while retaining single-click restoration of the top banner.
+* **FR-UX-03 (Google-Style Top-Right User Profile Badge & Scrollable Account Switcher Menu):**
+  * The main portal header shall feature a prominent **Google-style User Profile Badge** (`#googleProfileBtn`) on the top-right displaying the active user's circular avatar initials (`AD`, `RS`, `ED`, or `G`), full name, GSIS ID, and live phase badge (`Phase 2 Authenticated` in green vs. `Phase 1 Public Mode` in amber).
+  * Clicking the profile badge shall open an interactive **Google Account Switcher Popover** (`#googleAccountPopover`) displaying:
+    1. The active user's identity card (Name, Email, BP Number, Agency, Position, and Member Type).
+    2. A **1-Click Persona Switcher List** of all available mock accounts (5 pre-seeded personas + custom-created mock users).
+    3. **Viewport-Aware Vertical Scrolling (`max-height: calc(100vh - 92px); overflow-y: auto;`)** with a **Sticky Bottom Action Footer (`.popover-footer-actions`)** housing **`➕ Create Custom Mock Account`** and **`🚪 Sign Out of Phase 2`**, guaranteeing that bottom action buttons are never clipped or partially hidden across any browser resolution or zoom level.
+* **FR-UX-04 (Progressive Disclosure Multi-Agent Responses — Pinpoint Short Answer + Collapsible Full Breakdown):**
+  * Rather than overwhelming users with a full profile dump when asked a specific question (e.g., *"How much balance do I have in loan number CL-2024-88219?"* or *"How much is my total contribution?"*), the Multi-Agent Orchestrator (`GSIS_Concierge_Router` + Specialist Sub-Agents) shall return a dual-tier response payload (`short_reply` + `reply`):
+    1. **Direct Pinpoint Answer (`short_reply`):** Immediately visible at the top of the assistant's message bubble (1–2 sentences answering the exact monetary figure, loan ID balance, or policy rule requested, e.g., *"You have an outstanding balance of **₱142,500.00** on your Conso-Loan (`CL-2024-88219`), with **42 months remaining** at **₱6,120.00/month**."*).
+    2. **Interactive Expand/Collapse Details Button (`🔽 Show Full Details & Computation Breakdown` / `🔼 Hide Full Details`):** Toggles a smooth collapsible drawer inside the chat bubble containing the complete portfolio breakdown tables, statutory computation formulas, and official GSIS policy citations.
+* **FR-UX-05 (Hard Cap of 25 Mock Users with Capacity Counter & Guardrail Notification):**
+  * To protect demo environment stability and prevent unbounded memory consumption, the backend database seeder (`MAX_MOCK_USERS = 25`) and frontend registration modal shall enforce a strict maximum of **25 total mock user accounts** (5 pre-seeded personas + up to 20 custom accounts).
+  * Once `25/25` capacity is reached, `POST /api/users` shall return HTTP `400` (`MAX_MOCK_USERS_REACHED`), disable the submit button, and surface a prominent red capacity notification banner inside the registration modal.
+
+### 10.4 Defense-in-Depth AI Security: Google Cloud Model Armor & RA 10173 (`NFR-SEC`)
 
 | Security Control Layer | Google Cloud Technology | Threat Mitigated | Enforcement Action |
 | :--- | :--- | :--- | :--- |

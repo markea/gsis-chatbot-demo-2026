@@ -557,11 +557,83 @@ The frontend (`static/index.html` + `static/app.js` + `static/styles.css`) provi
 gcloud config set project markea-testbed-dev
 
 # 2. Build and deploy the GSIS Omnichannel Multi-Agent Demo to Cloud Run (asia-southeast1)
-gcloud run deploy gsis-chatbot-demo-2026 \
-  --source . \
+gcloud run deploy gsis-gabay-ai-demo \
+  --source demo \
   --region asia-southeast1 \
   --allow-unauthenticated \
   --memory 1Gi \
   --cpu 2 \
   --set-env-vars="GCP_PROJECT_ID=markea-testbed-dev,GCP_LOCATION=asia-southeast1,MODEL_ARMOR_ENABLED=true"
 ```
+
+---
+
+## 11. Post-Deployment Iterative Engineering & UX Mini Tech Spec (`v1.1` — Revisions `00001` to `00005-jsp`)
+
+Following initial deployment to Google Cloud Run (`https://gsis-gabay-ai-demo-jprf6uux5q-as.a.run.app`), four key engineering and user-experience enhancements were architected, implemented, and deployed across `demo/backend/` and `demo/static/`.
+
+### 11.1 Summary of Iterative Enhancements
+
+| Spec ID | Feature / Enhancement | Target Components | Cloud Run Revision |
+| :--- | :--- | :--- | :--- |
+| **`SPEC-DB-01`** | **Dual-Mode Embedded SQLite (`tmpfs`) + In-Memory RAG & 25-User Cap** | `demo/backend/db_adapter.py`, `demo/backend/rag_engine.py`, `demo/main.py` | `00001-x7k` |
+| **`SPEC-UX-01`** | **Collapsible Top Disclaimer Banner & Floating `⚠️ STRICTLY DEMO ONLY` Pill** | `demo/static/index.html`, `demo/static/styles.css`, `demo/static/app.js` | `00002-p8n` |
+| **`SPEC-UX-02`** | **Pointer-Events Draggable Floating Demo Pill + Google-Style Top-Right Profile Badge & Account Switcher** | `demo/static/index.html`, `demo/static/styles.css`, `demo/static/app.js` | `00003-r5q` |
+| **`SPEC-AI-01`** | **Progressive Disclosure Multi-Agent Replies (`short_reply` Pinpoint Summary + Collapsible Full Breakdown)** | `demo/backend/multi_agent.py`, `demo/main.py`, `demo/static/app.js`, `demo/static/styles.css` | `00004-bs4` |
+| **`SPEC-UX-03`** | **Viewport-Aware Scrollable Google Account Switcher Popover with Sticky Footer Buttons** | `demo/static/styles.css` | `00005-jsp` |
+
+---
+
+### 11.2 Detailed Technical Specifications
+
+#### 11.2.1 `SPEC-DB-01`: Dual-Mode Database Adapter & 25-User Capacity Guardrail
+* **Problem Statement:** Provisioning a dedicated 24/7 AlloyDB cluster for an on-demand executive demo incurs continuous hourly compute costs even when idle. Additionally, open registration on a public demo URL requires a strict upper bound on user creation.
+* **Technical Solution (`demo/backend/db_adapter.py`):**
+  1. **Embedded SQLite 3 In-Memory `tmpfs` Engine (Default Demo Mode):**
+     * Stores all 6 relational tables (`member_profiles`, `member_contributions`, `member_loans`, `member_benefits_summary`, `member_transactions`, `security_audit_logs`) in `/tmp/gsis_demo.db` inside Cloud Run's RAM-backed filesystem (`<1ms` query latency, `$0.00` idle cost).
+     * Automatically seeds **5 deterministic GSIS personas** (*Maria Clara Santos*, *Engr. Juan Dela Cruz*, *Lola Rosa Reyes*, *Capt. Antonio Luna*, *Dr. Josefa Llanes-Escoda*) on startup (`init_db()`).
+  2. **Drop-In AlloyDB PostgreSQL 15 + `pgvector` Upgrade Path:**
+     * Setting `DATABASE_URL=postgresql://...` seamlessly switches the connection pool (`asyncpg`) to AlloyDB without modifying MCP tool signatures.
+  3. **25-User Capacity Enforcement (`MAX_MOCK_USERS = 25`):**
+     * `create_custom_member()` checks `SELECT COUNT(*) FROM member_profiles` prior to insertion. Once `count >= 25`, it raises a structured `MAX_MOCK_USERS_REACHED` exception mapped to HTTP `400` (`POST /api/users`), and updates the live UI badge (`5 / 25 Max Users`).
+
+#### 11.2.2 `SPEC-UX-01` & `SPEC-UX-02`: Collapsible Demo Disclaimer & Draggable Floating Pill Badge
+* **Problem Statement:** While executive governance requires a prominent `⚠️ STRICTLY DEMO ONLY` indicator at all times, a static top bar consumes vertical space, and a fixed floating pill at the bottom-left can overlap the chatbot input box on compact screens.
+* **Technical Solution (`demo/static/index.html`, `demo/static/styles.css`, `demo/static/app.js`):**
+  1. **Collapsible Top Banner (`#demoDisclaimerBar`):**
+     * Clicking **`Hide ▲`** applies `.collapsed` (`max-height: 0; opacity: 0; pointer-events: none;`) to `#demoDisclaimerBar` and reveals `#floatingDemoPill`, persisting state in `localStorage.getItem('gsis_demo_disclaimer_collapsed')`.
+  2. **Pointer-Events Drag-and-Drop Controller (`initDraggableDemoPill()`):**
+     * Attaches `pointerdown`, `pointermove`, and `pointerup` listeners to `#floatingDemoPill` using `setPointerCapture(e.pointerId)`.
+     * Distinguishes between a click (`movement < 5px` $\rightarrow$ restores top banner via `toggleDemoDisclaimer(true)`) and a drag gesture (`movement >= 5px` $\rightarrow$ translates `left`/`top` coordinates clamped within `[8px, window.innerWidth - rect.width - 8px]` and `[8px, window.innerHeight - rect.height - 8px]`).
+     * Persists custom coordinates `(left, top)` in `localStorage.setItem('gsis_demo_pill_pos', JSON.stringify({ left, top }))` and re-clamps on `window.resize`.
+
+#### 11.2.3 `SPEC-UX-02` & `SPEC-UX-03`: Google-Style Top-Right User Profile Badge & Scrollable Account Switcher Popover
+* **Problem Statement:** Evaluators needed an immediately recognizable, Google-Account-style way to see which member persona is currently logged in, switch between Phase 2 accounts in one click, or sign out to Phase 1 without scrolling or having action buttons cut off on smaller laptop screens.
+* **Technical Solution (`demo/static/index.html`, `demo/static/styles.css`, `demo/static/app.js`):**
+  1. **Top-Right Identity Pill (`#googleProfileBtn`):**
+     * Renders a circular initial avatar (`#headerAvatarCircle`), user display name (`#headerUserName`), BP/GSIS ID (`#headerUserSub`), and a status dot (`#headerAvatarDot` — green for Phase 2 Authenticated, amber for Phase 1 Guest).
+  2. **Viewport-Aware Scrollable Popover (`#googleAccountPopover`):**
+     * Styled with `max-height: calc(100vh - 92px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;` so the menu adapts dynamically to any browser viewport height.
+     * **Sticky Bottom Action Footer (`.popover-footer-actions`):** Configured with `position: sticky; bottom: -16px; background: #EEF2F9; padding: 10px 0 4px; border-top: 1px solid #CBD5E1; z-index: 2;` so the two primary action buttons (`➕ Create Custom Mock Account` and `🚪 Sign Out of Phase 2`) remain permanently visible at the bottom of the popover while scrolling through the persona list.
+
+#### 11.2.4 `SPEC-AI-01`: Progressive Disclosure Multi-Agent Responses (`short_reply` + Expandable Full Details)
+* **Problem Statement:** Previously, when a user asked a specific, targeted question (e.g., *"How much balance do I have in loan number CL-2024-88219?"* or *"How much is my total contribution?"*), the multi-agent system returned a comprehensive profile view with full tables and computation rules all at once. Users needed a concise, direct answer first, paired with an optional expand/collapse button for the full breakdown.
+* **Technical Solution (`demo/backend/multi_agent.py`, `demo/static/app.js`, `demo/static/styles.css`):**
+  1. **Dual-Tier Response Contract (`ChatResponse`):**
+     ```json
+     {
+       "short_reply": "You have an outstanding balance of **₱142,500.00** on your **Conso-Loan (`CL-2024-88219`)**, with **42 months remaining** at **₱6,120.00/month**.",
+       "reply": "### Full Loan Portfolio & MPL Flex Net Proceeds Breakdown\n| Loan ID | Type | Principal | Monthly Amortization | Remaining | Balance |\n...",
+       "agent_invoked": "GSIS_Loans_Computation_Agent",
+       "mcp_tools_called": ["get_member_loans(bp_number=SESSION_BOUND)"],
+       "model_armor": { "verdict": "PASS" }
+     }
+     ```
+  2. **Pinpoint Intent & Entity Extraction (`multi_agent.py`):**
+     * **Specific Loan ID Match:** Scans the user prompt for any loan ID (`CL-XXXX-XXXXX`, `MPL-XXXX-XXXXX`, `EL-XXXX-XXXXX`, `PL-XXXX-XXXXX`) or loan type keyword (`conso`, `emergency`, `mpl`, `policy`) and generates a 1-sentence `short_reply` with the exact PHP balance (`₱XX,XXX.XX`) and remaining months for that specific loan.
+     * **Specific Contribution / Net Proceeds / Retirement Match:** Extracts the exact requested metric (`total_contributions`, `net_proceeds`, `bmp_monthly`, or `total_outstanding_balance`) into `short_reply` while preserving the full tabular audit in `reply`.
+     * **Gemini 3.7 Flash / 3.1 Pro Prompt Instruction:** Instructs the LLM synthesizer to emit a `[SHORT_ANSWER]` block (max 1–2 sentences with the exact PHP figure) followed by `[FULL_DETAILS]` (Markdown tables, statutory formulas, and citations).
+  3. **Frontend Expand/Collapse Accordion (`renderMessageBubble` in `demo/static/app.js`):**
+     * Displays `short_reply` prominently inside `<div class="short-answer-box">`.
+     * Renders an interactive **`🔽 Show Full Details & Computation Breakdown`** toggle button (`<button class="toggle-full-answer-btn">`) that smoothly expands/collapses `<div class="full-answer-collapsible">` (`display: none` $\leftrightarrow$ `display: block`) and updates the button label to **`🔼 Hide Full Details`**.
+
