@@ -1,0 +1,12 @@
+# Terraform provider binaries and local state
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/crash.log
+
+# Python caches and local runtime SQLite DB
+**/__pycache__/
+*.py[cod]
+*.sqlite3
+*.db
+.env
