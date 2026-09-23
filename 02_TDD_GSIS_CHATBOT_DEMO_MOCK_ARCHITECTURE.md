@@ -227,9 +227,39 @@ CREATE TABLE IF NOT EXISTS gsis_faq_knowledge_vectors (
 
 ---
 
-## 4. Age- & Civil-Status-Consistent Synthetic Member Data Generator
+## 4. Age- & Civil-Status-Consistent Synthetic Member Data Generator & 25-User Quota Guard
 
-When a user registers a mock account via `POST /api/auth/register-mock`, the seeder engine (`seeder_engine.py`) executes the following deterministic rules so that all generated records are 100% consistent with the user's **Birthday**, **Gender**, and **Civil Status**:
+### 4.1 Hard Quota Enforcement (`MAX_MOCK_USERS = 25`)
+Before creating any new mock user via `POST /api/auth/register-mock`, the backend checks the current count of mock users in `member_profiles`. Once `current_mock_user_count >= 25`, the API rejects new registrations with an `HTTP 429 (DEMO_USER_LIMIT_REACHED)` error payload that triggers a prominent **Error Notification Banner & Modal** in the UI:
+
+```python
+MAX_MOCK_USERS = 25
+
+def enforce_mock_user_quota(db_session) -> dict:
+    current_count = db_session.execute(
+        text("SELECT COUNT(*) FROM member_profiles WHERE is_system_seed = FALSE")
+    ).scalar() or 0
+
+    if current_count >= MAX_MOCK_USERS:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error_code": "DEMO_USER_LIMIT_REACHED",
+                "current_mock_users": current_count,
+                "max_mock_users": MAX_MOCK_USERS,
+                "title": "Maximum Demo User Limit Reached (25/25)",
+                "message": (
+                    "The maximum limit of 25 custom Mock Users for this demo environment has been reached. "
+                    "New mock user creation is disabled. Please sign in using one of the existing demo accounts "
+                    "or pre-seeded GSIS personas."
+                )
+            }
+        )
+    return {"current_mock_users": current_count, "remaining_slots": MAX_MOCK_USERS - current_count}
+```
+
+### 4.2 Age- & Civil-Status-Consistent Data Generator (`seeder_engine.py`)
+When `current_mock_user_count < 25`, the seeder engine (`seeder_engine.py`) executes the following deterministic rules so that all generated records are 100% consistent with the user's **Birthday**, **Gender**, and **Civil Status**:
 
 ```python
 from datetime import date, timedelta
@@ -312,9 +342,9 @@ def generate_age_consistent_member_data(
 
 ---
 
-## 5. Authentication, Mock Registration & Interactive Simulated 6-Digit OTP Flow
+## 5. Authentication, Mock Registration (Max 25 Limit) & Interactive Simulated 6-Digit OTP Flow
 
-To satisfy both ease-of-demo and CISO MFA expectations, authentication is implemented as a **two-step flow with an on-screen simulated OTP toast**:
+To satisfy both ease-of-demo, sandbox capacity governance (`MAX_MOCK_USERS = 25`), and CISO MFA expectations, authentication is implemented as a **two-step flow with quota validation and an on-screen simulated OTP toast**:
 
 ```mermaid
 sequenceDiagram
@@ -327,13 +357,20 @@ sequenceDiagram
     alt Path A: Existing Demo Persona or Username/Password Login
         User->>SPA: Enters Username & Password (or clicks Demo Persona Chip)
         SPA->>AuthAPI: POST /api/auth/login {username, password}
-    else Path B: Self-Service Mock Registration
-        User->>SPA: Enters Email, Username, Password, Name, Birthday, Gender, Civil Status, Mobile, Agency (or clicks "1-Click Random Fill")
+    else Path B: Self-Service Mock Registration (Enforces Max 25 Users)
+        User->>SPA: Enters Email, Username, Password, Name, Birthday, Gender, Civil Status, Mobile, Agency
         SPA->>AuthAPI: POST /api/auth/register-mock
-        AuthAPI->>DB: Generate Age-Bounded GSIS Profile, Contributions, Loans, Benefits & Ledger Rows
+        AuthAPI->>DB: Check current Mock User Count (MAX_MOCK_USERS = 25)
+        alt Count >= 25 (Quota Reached)
+            DB-->>AuthAPI: Returns Count = 25
+            AuthAPI-->>SPA: HTTP 429 {error_code: "DEMO_USER_LIMIT_REACHED", message: "Max 25 Mock Users Reached"}
+            SPA-->>User: Displays Red Error Notification Banner & Toast ("Max of 25 Mock Users Reached!")
+        else Count < 25 (Quota Available)
+            AuthAPI->>DB: Generate Age-Bounded GSIS Profile, Contributions, Loans, Benefits & Ledger Rows
+        end
     end
 
-    AuthAPI-->>SPA: Returns {otp_Required: true, temp_session_id, simulated_otp_code: "482910", masked_destination: "d***@gsis.gov.ph / +63 917-***-8821"}
+    AuthAPI-->>SPA: Returns {otp_required: true, temp_session_id, simulated_otp_code: "482910", masked_destination: "d***@gsis.gov.ph / +63 917-***-8821"}
     SPA-->>User: Displays Simulated SMS/Email OTP Toast ("Demo OTP Code: 482910") + "1-Click Auto-Fill & Verify OTP" Button
     User->>SPA: Clicks "1-Click Auto-Fill & Verify OTP"
     SPA->>AuthAPI: POST /api/auth/verify-otp {temp_session_id, otp_code: "482910"}

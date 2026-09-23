@@ -247,8 +247,11 @@ To power a compelling, realistic executive demo where any evaluator can either l
      * **Employment & Demo Profile Selector (Pre-filled Dropdowns with Smart Defaults):**
        * **Government Agency / Sector** *(e.g., `DepEd`, `DOH`, `DICT`, `LGU - Quezon City`, `SUC - UP System`, `DOJ`)*
        * **Member Category** *(`Active Government Employee` vs. `Old-Age / Survivorship Pensioner`)*
-3. **Automated Age-Aware Synthetic Data Generation Upon Sign-Up:**
-   * Immediately upon registration, the backend executes an atomic database transaction in AlloyDB that uses the user's **Birthday**, **Gender**, **Civil Status**, and **Agency** to generate a 100% mathematically and actuarially consistent GSIS dataset:
+     * **Demo Sandbox Quota Guardrail (`MAX_MOCK_USERS = 25`):**
+       * To protect AlloyDB storage and prevent automated abuse on the public Cloud Run demo URL, the system enforces a strict ceiling of **25 Mock User Accounts**.
+       * Once `COUNT(member_profiles) >= 25`, any new mock registration attempt is blocked and triggers a prominent **Error Notification Banner & Toast**: *"⚠️ Demo Sandbox Limit Reached (25/25 Mock Users Created). New mock user registration is disabled. Please log in using one of the existing demo accounts."*
+3. **Automated Age-Aware Synthetic Data Generation Upon Sign-Up (When Count < 25):**
+   * Immediately upon registration, the backend verifies that the current mock user count is below 25, then executes an atomic database transaction in AlloyDB that uses the user's **Birthday**, **Gender**, **Civil Status**, and **Agency** to generate a 100% mathematically and actuarially consistent GSIS dataset:
      * **Age-Consistent Service Duration (PPP):** Calculates current age from **Birthday** and generates a realistic `date_of_original_appointment` and `total_service_years` (e.g., if the user enters a birthday making them 30 years old, service duration is bounded to `2–8 years`; if 58 years old, service duration can be `18–32 years` to unlock retirement Option 1/Option 2 projections).
      * **Birth-Month APIR Alignment:** Sets the member's **APIR (Annual Pensioners' Information Revalidation)** schedule month directly to their **Birthday month**.
      * **Civil-Status Beneficiary Generation:** Auto-generates legal beneficiaries matching their **Civil Status** (e.g., legal spouse + children as primary beneficiaries if `Married`; parents/siblings if `Single`).
@@ -263,16 +266,23 @@ sequenceDiagram
 
     Evaluator->>UI: Fills "Create Mock Account" (Email, Username, Password, Name, Birthday, Gender, Civil Status, Mobile, Agency)
     UI->>Auth: POST /api/auth/register-mock-user
-    Auth->>Auth: Generate randomized GSIS BP Number (e.g., 2001-948271-3) & CRN
-    Auth->>Auth: Derive Member Age from Birthday -> Bound Service Duration (PPP) & Set APIR Birth-Month
-    Auth->>Auth: Generate Legal Beneficiaries based on Civil Status & Gender
-    Auth->>Auth: Compute mathematically consistent Monthly Contributions (9% EE / 12% ER) over duration
-    Auth->>Auth: Generate 1–3 Active Loans (e.g., MPL Flex, Emergency Loan) with realistic balances & remaining durations
-    Auth->>Auth: Compute Retirement BMP & Life Insurance CSV projections + 10 Recent Ledger Transactions
-    Auth->>DB: Commit Member Profile, Beneficiaries, Contributions, Loans, Benefits & Transactions
-    DB-->>Auth: Transaction Confirmed
-    Auth-->>UI: Issue JWT Session Token + Synthetic Profile Summary Card
-    UI-->>Evaluator: Logged In (Phase 2 Active) — Ready to ask personal questions!
+    Auth->>DB: SELECT COUNT(*) FROM member_profiles
+    alt Quota Reached (Count >= 25 Mock Users)
+        DB-->>Auth: Returns Count = 25
+        Auth-->>UI: HTTP 429/403 {error: "DEMO_USER_LIMIT_REACHED", max_users: 25}
+        UI-->>Evaluator: Displays Error Notification Banner ("Max of 25 Mock Users Reached — Please use an existing Demo Account")
+    else Quota Available (Count < 25 Mock Users)
+        Auth->>Auth: Generate randomized GSIS BP Number (e.g., 2001-948271-3) & CRN
+        Auth->>Auth: Derive Member Age from Birthday -> Bound Service Duration (PPP) & Set APIR Birth-Month
+        Auth->>Auth: Generate Legal Beneficiaries based on Civil Status & Gender
+        Auth->>Auth: Compute mathematically consistent Monthly Contributions (9% EE / 12% ER) over duration
+        Auth->>Auth: Generate 1–3 Active Loans (e.g., MPL Flex, Emergency Loan) with realistic balances & remaining durations
+        Auth->>Auth: Compute Retirement BMP & Life Insurance CSV projections + 10 Recent Ledger Transactions
+        Auth->>DB: Commit Member Profile, Beneficiaries, Contributions, Loans, Benefits & Transactions
+        DB-->>Auth: Transaction Confirmed
+        Auth-->>UI: Issue Simulated 6-Digit OTP -> JWT Session Token + Synthetic Profile Summary Card
+        UI-->>Evaluator: Logged In (Phase 2 Active) — Ready to ask personal questions!
+    end
 ```
 
 ### 8.2 AlloyDB Relational & Vector Schema Specification
@@ -311,6 +321,9 @@ sequenceDiagram
   * **Email Address** *(Required)*, **Username** *(Required)*, and **Password** *(Required)*
   * **Full Name** *(Required)*, **Date of Birth (Birthday)** *(Required)*, and **Gender / Sex** *(Required)*
   * **Civil Status** *(`Single`, `Married`, `Widowed`, `Separated`)*, **Mobile Number** *(`+63`)*, **Agency / Sector**, and **Membership Type** *(`Active` vs. `Pensioner`)* — with a **"Randomize / Auto-Fill Demo Fields"** button for rapid 1-click testing, followed by the simulated 6-digit OTP confirmation.
+* **FR-P2-02b (Maximum 25 Mock Users Hard Limit & Quota Error Notification):** The demo environment shall enforce a maximum capacity of **25 Mock Users (`MAX_MOCK_USERS = 25`)**:
+  * The registration modal shall display a live quota counter badge (e.g., **`Mock User Slots Used: 14 / 25`**).
+  * Once 25 mock users have been created in the database, any attempt to create a 26th mock user shall be rejected by the backend (`HTTP 429 / DEMO_USER_LIMIT_REACHED`) and display a prominent **Error Notification Modal & Banner**: *"⚠️ Maximum Demo Capacity Reached (25/25 Mock Users). Creation of new mock users is disabled. Please sign in using one of the existing demo personas."*
 * **FR-P2-03 (Automatic Age- & Civil-Status-Consistent Member Data Generation):** Upon creating a mock user, the system shall automatically generate randomized, mathematically consistent records in AlloyDB covering:
   * Member profile, employer agency, salary grade, basic monthly salary, **creditable service duration (bounded accurately by the user's Birthday/Age)**, and **legal beneficiaries** aligned with their **Civil Status**.
   * Historical and recent monthly **contributions** (Employee 9% and Government 12% shares) + total accumulated contributions.
