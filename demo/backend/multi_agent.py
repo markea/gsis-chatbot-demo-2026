@@ -342,9 +342,27 @@ def run_multi_agent_turn(
         q_lower = clean_prompt.lower()
         is_yn = _is_yes_no_question(clean_prompt)
         if is_yn and ("unposted" in q_lower or "missing" in q_lower):
-            short_reply_text = "🎯 **Direct Answer:** **Yes.**" if contribs["unposted_months_count"] > 0 else "🎯 **Direct Answer:** **No.**"
+            if contribs["unposted_months_count"] > 0:
+                short_reply_text = (
+                    f"🎯 **Direct Answer:** **Yes** — you have **{contribs['unposted_months_count']} unposted ERF remittance (`{unposted_periods}`)** "
+                    f"pending AAO reconciliation at **{profile['agency_code']}**."
+                )
+            else:
+                short_reply_text = (
+                    f"🎯 **Direct Answer:** **No** — all **{contribs['posted_months_count']} of {contribs['months_inspected']} months** "
+                    f"of your GSIS contributions are **100% POSTED** (`0 unposted months`)."
+                )
         elif is_yn and ("posted" in q_lower or "complete" in q_lower or "updated" in q_lower):
-            short_reply_text = "🎯 **Direct Answer:** **Yes.**" if contribs["unposted_months_count"] == 0 else "🎯 **Direct Answer:** **No.**"
+            if contribs["unposted_months_count"] == 0:
+                short_reply_text = (
+                    f"🎯 **Direct Answer:** **Yes** — all **{contribs['posted_months_count']} of {contribs['months_inspected']} months** "
+                    f"of your GSIS contributions are **100% POSTED**."
+                )
+            else:
+                short_reply_text = (
+                    f"🎯 **Direct Answer:** **No** — **{contribs['posted_months_count']} of {contribs['months_inspected']} months** are posted, "
+                    f"with **{contribs['unposted_months_count']} unposted ERF month (`{unposted_periods}`)**."
+                )
         elif "beneficiar" in q_lower and "contribut" not in q_lower:
             short_reply_text = (
                 f"🎯 **Direct Answer:** Based on your **{profile['civil_status']}** civil status (`BP {authenticated_bp}`), "
@@ -431,10 +449,36 @@ def run_multi_agent_turn(
         if is_yn and not any(w in q_lower for w in ["how much", "what is", "show", "list"]):
             if any(w in q_lower for w in ["can i", "am i eligible", "am i qualified", "reloan"]):
                 can_reloan = sim["gaa_5000_threshold_passed"] and sim["estimated_net_proceeds"] > 0
-                short_reply_text = "🎯 **Direct Answer:** **Yes.**" if can_reloan else "🎯 **Direct Answer:** **No.**"
+                if can_reloan:
+                    short_reply_text = (
+                        f"🎯 **Direct Answer:** **Yes** — you are eligible to reloan up to **PHP {sim['gross_loan_amount']:,.2f}** (`MPL Flex`), "
+                        f"yielding **PHP {sim['estimated_net_proceeds']:,.2f}** in estimated net proceeds."
+                    )
+                else:
+                    short_reply_text = (
+                        f"🎯 **Direct Answer:** **No** — your current net take-home pay or PPP does not meet the statutory reloan threshold."
+                    )
+            elif "emergency" in q_lower:
+                if matched_specific_loan:
+                    short_reply_text = (
+                        f"🎯 **Direct Answer:** **Yes** — you have an active **`{matched_specific_loan['loan_type']}` (`{matched_specific_loan['loan_id']}`)** "
+                        f"with an outstanding balance of **PHP {matched_specific_loan['outstanding_balance']:,.2f}**."
+                    )
+                else:
+                    short_reply_text = "🎯 **Direct Answer:** **No** — you do not have an active Emergency Loan on record."
             else:
-                has_loans = (matched_specific_loan is not None) if "emergency" in q_lower else (loans_info["active_loans_count"] > 0)
-                short_reply_text = "🎯 **Direct Answer:** **Yes.**" if has_loans else "🎯 **Direct Answer:** **No.**"
+                count = loans_info["active_loans_count"]
+                if count > 0:
+                    loan_names = " & ".join(f"`{l['loan_type']}`" for l in loans_info["loans"])
+                    plural = "s" if count > 1 else ""
+                    short_reply_text = (
+                        f"🎯 **Direct Answer:** **Yes** — you have **{count} active loan{plural}** ({loan_names}) "
+                        f"totaling **PHP {loans_info['total_outstanding_balance']:,.2f}**."
+                    )
+                else:
+                    short_reply_text = (
+                        "🎯 **Direct Answer:** **No** — you currently have **0 active loans** (`PHP 0.00` outstanding balance)."
+                    )
         elif matched_specific_loan:
             short_reply_text = (
                 f"🎯 **Direct Answer:** Your outstanding balance for **`{matched_specific_loan['loan_type']}` (`{matched_specific_loan['loan_id']}`)** "
@@ -505,10 +549,28 @@ def run_multi_agent_turn(
         is_yn = _is_yes_no_question(clean_prompt)
         if is_yn and not any(w in q_lower for w in ["how much", "what is", "show"]):
             if "apir" in q_lower:
-                short_reply_text = "🎯 **Direct Answer:** **Yes.**" if benefits.get("apir_status") == "ACTIVE_COMPLIANT" else "🎯 **Direct Answer:** **No.**"
+                if benefits.get("apir_status") == "ACTIVE_COMPLIANT":
+                    short_reply_text = (
+                        f"🎯 **Direct Answer:** **Yes** — your APIR status is **`ACTIVE_COMPLIANT`** "
+                        f"(next due on **`{benefits['apir_next_due_date']}`**)."
+                    )
+                else:
+                    short_reply_text = (
+                        f"🎯 **Direct Answer:** **No** — your APIR status is **`{benefits['apir_status']}`** "
+                        f"(next due on **`{benefits['apir_next_due_date']}`**)."
+                    )
             else:
                 is_retire_eligible = benefits.get("age", 0) >= 60 and calc.get("ppp_years", 0) >= 15
-                short_reply_text = "🎯 **Direct Answer:** **Yes.**" if is_retire_eligible else "🎯 **Direct Answer:** **No.**"
+                if is_retire_eligible:
+                    short_reply_text = (
+                        f"🎯 **Direct Answer:** **Yes** — at **Age {benefits['age']}** with **{calc['ppp_years']} PPP years**, "
+                        f"you qualify for RA 8291 retirement (**BMP: PHP {calc['final_bmp']:,.2f}/month**)."
+                    )
+                else:
+                    short_reply_text = (
+                        f"🎯 **Direct Answer:** **No** — you are currently **Age {benefits['age']}** with **{calc['ppp_years']} PPP years** "
+                        f"(RA 8291 requires Age 60 + 15 PPP years; your projected BMP at Age 60 is **PHP {calc['final_bmp']:,.2f}/month**)."
+                    )
         elif "apir" in q_lower and "option" not in q_lower and "pension" not in q_lower:
             short_reply_text = (
                 f"🎯 **Direct Answer:** Your **APIR Status** is **`{benefits['apir_status']}`** with a next scheduled due date of "
