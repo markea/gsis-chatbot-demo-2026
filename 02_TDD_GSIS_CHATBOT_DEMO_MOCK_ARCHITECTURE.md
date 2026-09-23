@@ -581,6 +581,7 @@ Following initial deployment to Google Cloud Run (`https://gsis-gabay-ai-demo-jp
 | **`SPEC-UX-02`** | **Pointer-Events Draggable Floating Demo Pill + Google-Style Top-Right Profile Badge & Account Switcher** | `demo/static/index.html`, `demo/static/styles.css`, `demo/static/app.js` | `00003-r5q` |
 | **`SPEC-AI-01`** | **Progressive Disclosure Multi-Agent Replies (`short_reply` Pinpoint Summary + Collapsible Full Breakdown)** | `demo/backend/multi_agent.py`, `demo/main.py`, `demo/static/app.js`, `demo/static/styles.css` | `00004-bs4` |
 | **`SPEC-UX-03`** | **Viewport-Aware Scrollable Google Account Switcher Popover with Sticky Footer Buttons** | `demo/static/styles.css` | `00005-jsp` |
+| **`SPEC-SEC-01`** | **Live Google Cloud Model Armor v1 API (`gsis-gabay-armor-v1`) & Cloud DLP SDP Custom InfoTypes (`gsis-gabay-sdp-inspect-v1` / `deid-v1`)** | `demo/backend/model_armor.py`, `demo/terraform/main.tf` | `00008+` |
 
 ---
 
@@ -637,4 +638,23 @@ Following initial deployment to Google Cloud Run (`https://gsis-gabay-ai-demo-jp
   3. **Frontend Expand/Collapse Accordion (`renderMessageBubble` in `demo/static/app.js`):**
      * Displays `short_reply` prominently inside `<div class="short-answer-box">`.
      * Renders an interactive **`🔽 Show Full Details & Computation Breakdown`** toggle button (`<button class="toggle-full-answer-btn">`) that smoothly expands/collapses `<div class="full-answer-collapsible">` (`display: none` $\leftrightarrow$ `display: block`) and updates the button label to **`🔼 Hide Full Details`**.
+
+#### 11.2.5 `SPEC-SEC-01`: Live Google Cloud Model Armor v1 API (`gsis-gabay-armor-v1`) & Cloud DLP SDP Custom InfoTypes
+* **Problem Statement:** To ensure the Executive Demo demonstrates genuine Google Cloud security posture rather than a purely local mock, `demo/backend/model_armor.py` was upgraded to invoke the live **Google Cloud Model Armor v1 Regional API** (`modelarmor.asia-southeast1.rep.googleapis.com`) and **Cloud Sensitive Data Protection (DLP)** templates in `markea-testbed-dev` while retaining all custom GSIS rules and session-bound cross-account isolation checks.
+* **Provisioned GCP Resources (`markea-testbed-dev`):**
+  1. **Cloud DLP Inspect Template (`projects/markea-testbed-dev/locations/asia-southeast1/inspectTemplates/gsis-gabay-sdp-inspect-v1`):**
+     * Built-in InfoTypes: `CREDIT_CARD_NUMBER`
+     * Imported Custom Regex InfoTypes:
+       * `PH_TIN_NUMBER`: `\b\d{3}-\d{3}-\d{3}-\d{3}\b` (`VERY_LIKELY`)
+       * `GSIS_CRN_NUMBER`: `\b006-\d{4}-\d{4}-\d{1}\b` (`VERY_LIKELY`)
+       * `GSIS_ADVERSARIAL_OVERRIDE_OR_SQLI`: `(ignore all previous instructions|system override|developer mode|dan mode|bypass authentication|drop table gsis|union select .* from gsis_members|dump all member records)` (`VERY_LIKELY`)
+  2. **Cloud DLP De-identify Template (`projects/markea-testbed-dev/locations/asia-southeast1/deidentifyTemplates/gsis-gabay-sdp-deid-v1`):**
+     * Replaces matched InfoTypes with `[REDACTED_BY_MODEL_ARMOR_SDP]`.
+  3. **Google Cloud Model Armor Template (`projects/markea-testbed-dev/locations/asia-southeast1/templates/gsis-gabay-armor-v1` & `us-central1`):**
+     * `piAndJailbreakFilterSettings`: `ENABLED` (`MEDIUM_AND_ABOVE`)
+     * `raiSettings`: `HATE_SPEECH`, `HARASSMENT`, `SEXUALLY_EXPLICIT`, `DANGEROUS` (`MEDIUM_AND_ABOVE`)
+     * `sdpSettings.advancedConfig`: Linked to `gsis-gabay-sdp-inspect-v1` and `gsis-gabay-sdp-deid-v1`.
+  4. **Hybrid Runtime Enforcement (`demo/backend/model_armor.py`):**
+     * Calls `POST https://modelarmor.asia-southeast1.rep.googleapis.com/v1/projects/markea-testbed-dev/locations/asia-southeast1/templates/gsis-gabay-armor-v1:sanitizeUserPrompt` and `:sanitizeModelResponse` on every chat turn.
+     * Combines live GCP Model Armor verdicts (`pi_and_jailbreak`, `sdp`, `rai`) with session-bound `BP_NUMBER_REGEX` horizontal privilege escalation checks (`UNAUTHENTICATED_BP_ENUMERATION` and `CROSS_ACCOUNT_BP_SPOOFING_ATTEMPT`) and returns live `gcp_model_armor_api` telemetry in the API payload.
 

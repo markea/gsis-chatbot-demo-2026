@@ -20,6 +20,8 @@ resource "google_project_service" "enabled_apis" {
     "artifactregistry.googleapis.com",
     "cloudbuild.googleapis.com",
     "aiplatform.googleapis.com",
+    "modelarmor.googleapis.com",
+    "dlp.googleapis.com",
     "secretmanager.googleapis.com",
     "iam.googleapis.com"
   ])
@@ -47,6 +49,18 @@ resource "google_service_account" "demo_sa" {
 resource "google_project_iam_member" "vertex_ai_user" {
   project = var.project_id
   role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.demo_sa.email}"
+}
+
+resource "google_project_iam_member" "model_armor_user" {
+  project = var.project_id
+  role    = "roles/modelarmor.user"
+  member  = "serviceAccount:${google_service_account.demo_sa.email}"
+}
+
+resource "google_project_iam_member" "dlp_user" {
+  project = var.project_id
+  role    = "roles/dlp.user"
   member  = "serviceAccount:${google_service_account.demo_sa.email}"
 }
 
@@ -105,6 +119,18 @@ resource "google_cloud_run_v2_service" "gsis_demo_service" {
       env {
         name  = "GOOGLE_CLOUD_REGION"
         value = var.region
+      }
+      env {
+        name  = "MODEL_ARMOR_LOCATION"
+        value = var.region
+      }
+      env {
+        name  = "MODEL_ARMOR_TEMPLATE_ID"
+        value = "projects/${var.project_id}/locations/${var.region}/templates/gsis-gabay-armor-v1"
+      }
+      env {
+        name  = "USE_LIVE_MODEL_ARMOR"
+        value = "true"
       }
       env {
         name  = "GSIS_DEMO_DB_PATH"
