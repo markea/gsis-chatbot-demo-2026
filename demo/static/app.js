@@ -345,10 +345,30 @@ function appendUserBubble(text) {
   container.scrollTop = container.scrollHeight;
 }
 
+let bubbleCounter = 0;
+
+function toggleFullAnswerDetails(bubbleId) {
+  const detailsEl = document.getElementById(`fullDetails_${bubbleId}`);
+  const btnEl = document.getElementById(`toggleFullBtn_${bubbleId}`);
+  if (!detailsEl || !btnEl) return;
+  const isHidden = detailsEl.style.display === "none";
+  if (isHidden) {
+    detailsEl.style.display = "block";
+    btnEl.innerHTML = "🔼 Hide Full Breakdown (Show Short Answer Only)";
+    btnEl.classList.add("expanded");
+  } else {
+    detailsEl.style.display = "none";
+    btnEl.innerHTML = "🔽 Show Full Details &amp; Computation Breakdown";
+    btnEl.classList.remove("expanded");
+  }
+}
+
 function appendAssistantBubble(data) {
   const container = document.getElementById("chatMessages");
   const row = document.createElement("div");
   row.className = "message-row assistant";
+  bubbleCounter += 1;
+  const bId = bubbleCounter;
 
   const trace = data.agent_trace || {};
   const specialist = trace.specialist_agent || "GSIS_Policy_FAQ_Agent (gemini-3.7-flash)";
@@ -388,14 +408,41 @@ function appendAssistantBubble(data) {
     `;
   }
 
+  const hasCollapsibleFull = Boolean(data.short_reply && data.full_reply && data.short_reply !== data.full_reply);
+
+  let mainContentHtml = "";
+  if (hasCollapsibleFull) {
+    mainContentHtml = `
+      <div class="short-answer-box">
+        ${formatMarkdownToHtml(data.short_reply)}
+      </div>
+      <button
+        type="button"
+        class="btn-toggle-full-answer"
+        id="toggleFullBtn_${bId}"
+        onclick="toggleFullAnswerDetails(${bId})"
+      >
+        🔽 Show Full Details &amp; Computation Breakdown
+      </button>
+      <div class="full-answer-collapse" id="fullDetails_${bId}" style="display:none;">
+        <div class="bubble-content">${formatMarkdownToHtml(data.full_reply)}</div>
+        ${toolsHtml}
+      </div>
+    `;
+  } else {
+    mainContentHtml = `
+      <div class="bubble-content">${formatMarkdownToHtml(data.reply)}</div>
+      ${toolsHtml}
+    `;
+  }
+
   row.innerHTML = `
     <div class="message-bubble">
       <div class="bubble-meta">
         <span>🤖 <strong>${specialist}</strong></span>
         ${armorBadge}
       </div>
-      <div class="bubble-content">${formatMarkdownToHtml(data.reply)}</div>
-      ${toolsHtml}
+      ${mainContentHtml}
       ${actionsHtml}
       ${loginPromptBtnHtml}
     </div>

@@ -1651,6 +1651,54 @@ body.disclaimer-hidden .chat-drawer {
   cursor: pointer;
 }
 
+.short-answer-box {
+  background: #F0FDF4;
+  border-left: 4px solid #10B981;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13.5px;
+  color: #0F172A;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.short-answer-box strong {
+  color: #065F46;
+}
+
+.btn-toggle-full-answer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #EFF6FF;
+  border: 1px solid #BFDBFE;
+  color: var(--gsis-blue-dark);
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.btn-toggle-full-answer:hover {
+  background: #DBEAFE;
+  border-color: var(--gsis-blue);
+}
+
+.btn-toggle-full-answer.expanded {
+  background: #FEF3C7;
+  border-color: #F59E0B;
+  color: #92400E;
+}
+
+.full-answer-collapse {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #CBD5E1;
+  animation: popoverFadeIn 0.18s ease-out;
+}
+
 /* ===================================================================== */
 /* 7. MODALS, QUOTA PROGRESS BAR & 25-USER LIMIT ERROR BANNER            */
 /* ===================================================================== */

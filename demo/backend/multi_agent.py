@@ -178,6 +178,8 @@ def run_multi_agent_turn(
     mcp_tools_called.append({"tool": "search_gsis_faq_rag", "status": "SUCCESS", "matches": rag_res["matches_count"]})
     citations = rag_res["citations"]
 
+    short_reply_text = ""
+
     # -------------------------------------------------------------------------
     # CASE A: Phase 1 Unauthenticated User Asking About Personal Records
     # -------------------------------------------------------------------------
@@ -189,6 +191,11 @@ def run_multi_agent_turn(
             if top_doc
             else ""
         )
+        short_reply_text = (
+            "🔒 **Direct Answer:** You are currently in **Phase 1 (Unauthenticated Guest Mode)**. "
+            "Please click **\"🔐 Sign In or Register Mock Member\"** below (or use the top-right User Profile Badge) "
+            "to view your personal loan balances, contribution ledger, or retirement payouts."
+        )
         reply_text = (
             "🔒 **Phase 2 Member Authentication Required (`JWT + 6-Digit OTP`)**\n\n"
             "You are currently browsing in **Phase 1 (Unauthenticated Guest Mode)**. "
@@ -196,7 +203,7 @@ def run_multi_agent_turn(
             "I can only access personal contribution ledgers, loan balances, net proceeds simulations, "
             "or retirement options after you sign in.\n\n"
             "### How to test Phase 2 right now:\n"
-            "1. Click **\"🔐 Member Login / Register\"** in the top navigation bar.\n"
+            "1. Click **\"🔐 Member Login / Register\"** or the **top-right User Profile Badge**.\n"
             "2. Select one of the **3 Pre-Seeded Personas** (`maria.santos`, `juan.delacruz`, or `rosa.reyes` — password `gsis2026`) "
             "or click **\"✨ Create Custom Mock Member\"** (up to 25 demo accounts).\n"
             "3. Complete the simulated **6-Digit OTP verification** — your `bp_number` will be cryptographically bound to your session!\n"
@@ -223,6 +230,12 @@ def run_multi_agent_turn(
             }
         )
         if calc_type == "retirement":
+            short_reply_text = (
+                f"🎯 **Direct Answer:** For a **PHP {sample_res['amc']:,.2f}** salary and **{sample_res['ppp_years']} years** of service, "
+                f"your estimated **Basic Monthly Pension (BMP)** is **PHP {sample_res['final_bmp']:,.2f}/month** "
+                f"(**Option 1 5-Yr Lump Sum**: **PHP {sample_res['option_1']['five_year_lump_sum']:,.2f}** | "
+                f"**Option 2 18-Mo Cash**: **PHP {sample_res['option_2']['eighteen_month_cash_payment']:,.2f}**)."
+            )
             reply_text = (
                 f"### 📊 Sample RA 8291 Retirement Computation (Unauthenticated Estimate)\n"
                 f"Based on your hypothetical inputs (**AMC: PHP {sample_res['amc']:,.2f}**, **PPP: {sample_res['ppp_years']} years**, **Age: 60**):\n\n"
@@ -234,6 +247,11 @@ def run_multi_agent_turn(
                 f"> {OFFICIAL_TENTATIVE_DISCLAIMER}"
             )
         else:
+            short_reply_text = (
+                f"🎯 **Direct Answer:** For a **PHP {sample_res['basic_monthly_salary']:,.2f}** salary and **{sample_res['ppp_years']} PPP years**, "
+                f"your maximum MPL Flex loan is **PHP {sample_res['gross_loan_amount']:,.2f}** ({sample_res['salary_multiplier_months']}× salary), "
+                f"yielding **PHP {sample_res['estimated_net_proceeds']:,.2f} in estimated net proceeds** (**PHP {sample_res['new_monthly_amortization']:,.2f}/month** for {sample_res['requested_term_months']} mos)."
+            )
             reply_text = (
                 f"### 🧮 Sample MPL Flex Loan Computation (Unauthenticated Estimate)\n"
                 f"Based on a hypothetical **Basic Monthly Salary of PHP {sample_res['basic_monthly_salary']:,.2f}** and **{sample_res['ppp_years']} PPP years**:\n\n"
@@ -263,13 +281,42 @@ def run_multi_agent_turn(
 
         beneficiaries_list = "\n".join(f"  - {b}" for b in profile.get("legal_beneficiaries", []))
         unposted_alert = ""
+        unposted_periods = ", ".join(u["period_month"] for u in contribs["unposted_periods"])
         if contribs["unposted_months_count"] > 0:
-            unposted_periods = ", ".join(u["period_month"] for u in contribs["unposted_periods"])
             unposted_alert = (
                 f"\n\n⚠️ **Unposted Remittance Alert (`{contribs['unposted_months_count']}` month detected: `{unposted_periods}`)**:\n"
                 f"Our ledger shows that your agency (**{profile['agency_name']}**) has a pending Electronic Remittance File (ERF) "
                 f"reconciliation for **{unposted_periods}**. Under GSIS policy, please coordinate with your Agency Authorized Officer (AAO) "
                 f"or click the **\"File ERF Reconciliation Ticket\"** action button below."
+            )
+
+        q_lower = clean_prompt.lower()
+        if "beneficiar" in q_lower and "contribut" not in q_lower:
+            short_reply_text = (
+                f"🎯 **Direct Answer:** Based on your **{profile['civil_status']}** civil status (`BP {authenticated_bp}`), "
+                f"your recognized RA 8291 legal beneficiaries are: **{' | '.join(profile.get('legal_beneficiaries', []))}**."
+            )
+        elif "unposted" in q_lower or "erf" in q_lower:
+            if contribs["unposted_months_count"] > 0:
+                short_reply_text = (
+                    f"🎯 **Direct Answer:** You have **{contribs['unposted_months_count']} unposted ERF remittance (`{unposted_periods}`)** "
+                    f"pending AAO reconciliation at **{profile['agency_code']}**, while **{contribs['posted_months_count']} of {contribs['months_inspected']} months** are posted."
+                )
+            else:
+                short_reply_text = (
+                    f"🎯 **Direct Answer:** All **{contribs['posted_months_count']} of {contribs['months_inspected']} months** of your GSIS contributions are **100% POSTED** with **0 unposted ERF months**."
+                )
+        elif "contribut" in q_lower or "premium" in q_lower or "ledger" in q_lower:
+            unp_note = f" (⚠️ **{contribs['unposted_months_count']} unposted ERF in `{unposted_periods}`**)" if contribs["unposted_months_count"] > 0 else " (All 12 months posted)"
+            short_reply_text = (
+                f"🎯 **Direct Answer:** Over the last 12 months (`BP {authenticated_bp}`), your posted contributions total "
+                f"**PHP {contribs['total_personal_share_12m']:,.2f} Personal Share (9%)** and **PHP {contribs['total_government_share_12m']:,.2f} Government Share (12%)** "
+                f"across **{ profile['total_ppp_years']} years of PPP**{unp_note}."
+            )
+        else:
+            short_reply_text = (
+                f"🎯 **Direct Answer:** **{profile['full_name']}** (`BP {authenticated_bp}`) is an active **{profile['position_title']}** at **{profile['agency_code']}** "
+                f"(**Age {profile['age']}**, **{profile['civil_status']}**, **PPP: {profile['total_ppp_years']} years**, **Basic Monthly Salary: PHP {profile['basic_monthly_salary']:,.2f}**)."
             )
 
         reply_text = (
@@ -318,6 +365,39 @@ def run_multi_agent_turn(
         if not loan_rows_md:
             loan_rows_md = "- *No active outstanding loans on record.*\n"
 
+        # Pinpoint short answer based on what the user specifically asked
+        q_lower = clean_prompt.lower()
+        matched_specific_loan = None
+        for l in loans_info["loans"]:
+            if l["loan_id"].lower() in q_lower or (l["loan_type"] == "EMERGENCY_LOAN" and "emergency" in q_lower):
+                matched_specific_loan = l
+                break
+
+        if matched_specific_loan:
+            short_reply_text = (
+                f"🎯 **Direct Answer:** Your outstanding balance for **`{matched_specific_loan['loan_type']}` (`{matched_specific_loan['loan_id']}`)** "
+                f"is **PHP {matched_specific_loan['outstanding_balance']:,.2f}** "
+                f"(with **{matched_specific_loan['remaining_months']} months** remaining at **PHP {matched_specific_loan['monthly_amortization']:,.2f}/month**)."
+            )
+        elif "balance" in q_lower and not any(w in q_lower for w in ["simulate", "reloan", "proceeds", "borrow"]):
+            if loans_info["active_loans_count"] == 0:
+                short_reply_text = f"🎯 **Direct Answer:** You currently have **PHP 0.00** in outstanding GSIS loan balances (`0 active loans`)."
+            else:
+                per_loan_str = " | ".join(
+                    f"**{l['loan_type']} (`{l['loan_id']}`)**: **PHP {l['outstanding_balance']:,.2f}**"
+                    for l in loans_info["loans"]
+                )
+                short_reply_text = (
+                    f"🎯 **Direct Answer:** Your total outstanding loan balance is **PHP {loans_info['total_outstanding_balance']:,.2f}** "
+                    f"({per_loan_str})."
+                )
+        else:
+            short_reply_text = (
+                f"🎯 **Direct Answer:** You can reloan a gross **MPL Flex** amount of **PHP {sim['gross_loan_amount']:,.2f}** ({sim['salary_multiplier_months']}× salary), "
+                f"giving you **PHP {sim['estimated_net_proceeds']:,.2f} in estimated net take-home proceeds** after deducting your **PHP {sim['outstanding_offset']:,.2f}** existing loan balance and fees "
+                f"(new monthly amortization: **PHP {sim['new_monthly_amortization']:,.2f}/month**)."
+            )
+
         gaa_badge = (
             "✅ **PASSES GAA PHP 5,000 Net Take-Home Pay Threshold**"
             if sim["gaa_5000_threshold_passed"]
@@ -359,6 +439,20 @@ def run_multi_agent_turn(
         calc = benefits["deterministic_ra8291_computation"]
         beneficiaries_str = ", ".join(benefits.get("legal_beneficiaries", []))
 
+        q_lower = clean_prompt.lower()
+        if "apir" in q_lower and "option" not in q_lower and "pension" not in q_lower:
+            short_reply_text = (
+                f"🎯 **Direct Answer:** Your **APIR Status** is **`{benefits['apir_status']}`** with a next scheduled due date of "
+                f"**`{benefits['apir_next_due_date']}`** (*{benefits['apir_birth_month_rule']}*)."
+            )
+        else:
+            short_reply_text = (
+                f"🎯 **Direct Answer:** Your deterministic **RA 8291 Basic Monthly Pension (BMP)** is **PHP {calc['final_bmp']:,.2f}/month** "
+                f"(**Option 1 5-Yr Lump Sum**: **PHP {calc['option_1']['five_year_lump_sum']:,.2f}** | "
+                f"**Option 2 18-Mo Cash Payment**: **PHP {calc['option_2']['eighteen_month_cash_payment']:,.2f}** + immediate monthly pension | "
+                f"**APIR Due**: `{benefits['apir_next_due_date']}`)."
+            )
+
         reply_text = (
             f"### 🏛️ RA 8291 Retirement Options, Survivorship & APIR Schedule (`BP {authenticated_bp}`)\n"
             f"- **Member**: **{benefits['member_name']}** | **Age**: **{benefits['age']}** | **Civil Status**: **{benefits['civil_status']}**\n"
@@ -383,6 +477,13 @@ def run_multi_agent_turn(
     # CASE F: Phase 1 / General GSIS Policy & FAQ RAG (`GSIS_Policy_FAQ_Agent`)
     # -------------------------------------------------------------------------
     else:
+        top_doc = citations[0] if citations else None
+        if top_doc:
+            first_para = top_doc["content"].split("\n\n")[0].strip()
+            short_reply_text = f"🎯 **Direct Answer ({top_doc['title']}):** {first_para}"
+        else:
+            short_reply_text = "🎯 **Direct Answer:** Please see the official GSIS policy guidance below."
+
         bullet_points = []
         for idx, doc in enumerate(citations, 1):
             bullet_points.append(
@@ -400,10 +501,13 @@ def run_multi_agent_turn(
 
     # Step 4: Google Cloud Model Armor Output Inspection (`sanitizeModelResponse`)
     armor_out = sanitize_model_response(response_text=reply_text, authenticated_bp=authenticated_bp)
+    short_armor_out = sanitize_model_response(response_text=short_reply_text, authenticated_bp=authenticated_bp)
     total_ms = round((time.perf_counter() - turn_start) * 1000, 2)
 
     return {
         "reply": armor_out["sanitized_response"],
+        "short_reply": short_armor_out["sanitized_response"],
+        "full_reply": armor_out["sanitized_response"],
         "agent_trace": {
             "router_agent": "GSIS_Concierge_Router (gemini-3.7-flash)",
             "specialist_agent": f"{specialist_agent} ({model_tier})",
