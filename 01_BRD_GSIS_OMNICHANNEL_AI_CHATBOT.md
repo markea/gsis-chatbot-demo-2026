@@ -40,13 +40,14 @@
 | `0.1-DRAFT` | 2026-09-22 | Mark Earvin Sarmiento | Initial requirements capture from GSIS discovery meeting. |
 | `1.0-BASE` | 2026-09-23 | Mark Earvin Sarmiento | Complete BRD covering Phase 1 (FAQ RAG), Phase 2 (Authenticated Personal Queries via MCP + AlloyDB), Multi-Agent Architecture, and Synthetic Member Demo Engine. |
 | `1.1-SEC` | 2026-09-23 | Mark Earvin Sarmiento | Added **Google Cloud Model Armor** inline AI security guardrails (Prompt Injection, Jailbreak, SDP/DLP PII masking, and Malicious URI protection) across the Multi-Agent pipeline. |
+| `1.2-ALIGNED` | 2026-09-23 | Mark Earvin Sarmiento | Incorporated deep-dive architectural alignments: (1) Read-Only + Simulation scope with *"Coming Soon!"* transactional action buttons, (2) 100% Deterministic Python/SQL calculators (zero LLM mental math) + legal disclaimers, (3) Interactive Simulated 6-Digit OTP MFA step after Username/Password & Mock Registration, (4) Dual-Mode AlloyDB Connector for 24/7 Cloud Run demo resilience, and (5) Omnichannel Dual-View UI (*GSIS Touch Mobile Frame* + *Web Portal View* + *Live MCP/Model Armor Inspector*). |
 
 ### 1.2 Stakeholder Sign-Off Matrix
 | Role | Organization | Responsibility | Status |
 | :--- | :--- | :--- | :--- |
 | **Executive Sponsor** | GSIS Office of the President and General Manager (OPGM) / ITSG | Strategic alignment & business sign-off | Pending Review |
 | **Business Owner** | GSIS Member Services & Operations Sector | FAQ policy accuracy, loan/benefit business rules | Pending Review |
-| **Information Security & Privacy** | GSIS Chief Information Security Officer (CISO) & Data Protection Officer (DPO) | RA 10173 (Data Privacy Act), Model Armor policy & auth review | Pending Review |
+| **Information Security & Privacy** | GSIS Chief Information Security Officer (CISO) & Data Protection Officer (DPO) | RA 10173 (Data Privacy Act), Model Armor policy & MFA/OTP review | Pending Review |
 | **Lead Cloud & AI Architect** | Google Cloud | Multi-Agent ADK, Model Armor, RAG, Cloud Run, and AlloyDB MCP architecture | Prepared |
 
 ---
@@ -61,18 +62,19 @@ To further elevate member experience and deflect high-volume repetitive inquirie
 To accelerate time-to-value while maintaining strict security governance, the deployment is structured into two distinct phases:
 1. **Phase 1 — Unauthenticated Public & Member FAQ Assistant:**
    * Immediately accessible without login on the GSIS Web Portal and Mobile App welcome screen.
-   * Answers general inquiries regarding GSIS membership, loan programs (MPL Flex, MPL Lite, Consolidated Loan, Emergency Loan, Policy Loan), retirement computation rules, survivorship/disability claims, maturity benefits, and documentary requirements.
+   * Answers general inquiries regarding GSIS membership, loan programs (MPL Flex, MPL Lite, Consolidated Loan, Emergency Loan, Policy Loan), retirement computation rules, survivorship/disability claims, maturity benefits, and documentary requirements, including **deterministic sample calculators** (zero LLM mental math).
    * Powered by **Retrieval-Augmented Generation (RAG)** grounded strictly in official GSIS citizen charters, circulars, and FAQs, and shielded by **Google Cloud Model Armor** against jailbreaks and off-topic manipulation.
 2. **Phase 2 — Authenticated Personal Member & Pensioner Self-Service Assistant:**
    * Encompasses all Phase 1 capabilities plus authenticated, conversational access to a member's **personal GSIS records**.
-   * Authenticates members via a **Username and Password** login flow mirroring the current GSIS web/mobile authentication pattern.
-   * Enables natural-language personal queries across **Compulsory Contributions, Credited Length of Service (Durations), Active Loans & Amortization Schedules, Tentative Loan Eligibility, Retirement/Benefit Projections, and Recent Transactions**.
-   * Powered by a **Multi-Agent AI Architecture** protected by **Google Cloud Model Armor** (`sanitizeUserPrompt` & `sanitizeModelResponse`) and connected to a secure **Model Context Protocol (MCP) Server** on **Google Cloud Run** backed by **AlloyDB for PostgreSQL**.
+   * Authenticates members via a **Username and Password** login flow paired with an **Interactive Simulated 6-Digit OTP (MFA)** verification step before issuing a BP-Number-bound JWT session token.
+   * Enables natural-language personal queries across **Compulsory Contributions, Credited Length of Service (Durations), Active Loans & Amortization Schedules, Deterministic Tentative Loan Eligibility, Retirement/Benefit Projections, and Recent Transactions**.
+   * Strictly enforces a **Read-Only + Tentative Simulation boundary**: when a member is ready to act (e.g., *"Apply for MPL Flex Loan"*, *"Schedule APIR Video Interview"*, or *"File ERF Remittance Reconciliation Ticket"*), the chatbot renders interactive call-to-action cards that display a **"Coming Soon! (Phase 3 Transactional Execution)"** modal—demonstrating the future end-to-end transaction vision safely.
 
 ### 2.2 Rapid Executive Demo & Synthetic Member Data Engine
 To demonstrate both Phase 1 and Phase 2 capabilities end-to-end without requiring live production core-banking/SAP connectivity during the initial evaluation, the Demo Environment includes:
-* A **Mobile-First Responsive Web Application** hosted on **Google Cloud Run** (featuring a toggleable Mobile App Frame for Android/iOS preview and Full Web Portal view).
-* A **Self-Service Mock User Registration Flow** (requiring an **Email Address**, username, password, full name, **birthday**, and **gender**) that automatically triggers a **Synthetic GSIS Member Profile Generator**, populating realistic randomized member records (BP Number, service duration, monthly contributions, active loans, benefits, and transaction ledgers) in **AlloyDB** for immediate live testing.
+* An **Omnichannel Dual-View Web Application** hosted on **Google Cloud Run**, allowing evaluators to toggle seamlessly between **Mode A: GSIS Touch Mobile App Simulator** (Android/iOS frame with eCard/UMID summary and embedded chat) and **Mode B: GSIS Web Portal View**, accompanied by a collapsible **Live Architecture, AlloyDB, MCP & Model Armor Inspector Drawer**.
+* A **Self-Service Mock User Registration Flow** (requiring **Email Address**, username, password, full name, **birthday**, **gender**, civil status, mobile number, and agency) + **Interactive 1-Click Simulated OTP Verification** that automatically triggers an **Age-Consistent Synthetic GSIS Member Profile Generator**.
+* A **Dual-Mode AlloyDB Connector** (`AlloyDB for PostgreSQL + pgvector` primary with automatic Cloud Run embedded/local persistence fallback) ensuring 24/7 zero-cold-start demo availability even when dedicated AlloyDB clusters are paused between executive briefings.
 
 ---
 
@@ -301,13 +303,14 @@ sequenceDiagram
   * **Digital Services:** GSIS Touch registration, Digital ID / eCard / UMID replacement, and APIR facial recognition steps.
 * **FR-P1-03 (Citation & Grounding Attribution):** Every policy response generated by `GSIS_Policy_FAQ_Agent` shall display source badges or references to the corresponding GSIS policy guide.
 * **FR-P1-04 (Authentication Upsell Prompt on Personal Queries):** If an unauthenticated Phase 1 user asks a personal account question (e.g., *"How much is my loan balance?"* or *"Check my contributions"*), the chatbot shall recognize the personal intent, explain that authentication is required to protect member privacy, and render an interactive **"Log In / Register Mock User"** button directly inside the chat interface.
+* **FR-P1-05 (Deterministic Sample Calculators + Mandatory Legal Disclaimer — Zero LLM Mental Math):** When a Phase 1 user asks for a sample loan or pension estimate based on hypothetical salary/service years, `GSIS_Policy_FAQ_Agent` shall invoke a deterministic Python calculator tool (`calculate_sample_loan_or_pension`) rather than relying on LLM mental arithmetic, and append an official **GSIS Tentative Computation Disclaimer**.
 
-### 9.2 Phase 2: Authentication & Mock User Onboarding Requirements
-* **FR-P2-01 (Username & Password Login):** The application shall provide a clean GSIS-branded Username and Password login modal/screen matching the GSIS portal experience.
+### 9.2 Phase 2: Authentication, Simulated MFA/OTP & Mock User Onboarding Requirements
+* **FR-P2-01 (Username/Password Login + Interactive Simulated 6-Digit OTP Verification):** The application shall provide a GSIS-branded Username and Password login screen followed by an **Interactive Simulated 6-Digit OTP Modal** (displaying an on-screen simulated SMS/Email toast with the 6-digit code e.g. `482910` and a **"1-Click Auto-Fill & Verify OTP"** button) to visually demonstrate MFA security compliance to GSIS CISO/DPO stakeholders.
 * **FR-P2-02 (Self-Service Mock User Registration with Personal & Demographic Details):** The application shall allow users to create a new mock account by submitting:
   * **Email Address** *(Required)*, **Username** *(Required)*, and **Password** *(Required)*
   * **Full Name** *(Required)*, **Date of Birth (Birthday)** *(Required)*, and **Gender / Sex** *(Required)*
-  * **Civil Status** *(`Single`, `Married`, `Widowed`, `Separated`)*, **Mobile Number** *(`+63`)*, **Agency / Sector**, and **Membership Type** *(`Active` vs. `Pensioner`)* — with a **"Randomize / Auto-Fill Demo Fields"** button for rapid 1-click testing.
+  * **Civil Status** *(`Single`, `Married`, `Widowed`, `Separated`)*, **Mobile Number** *(`+63`)*, **Agency / Sector**, and **Membership Type** *(`Active` vs. `Pensioner`)* — with a **"Randomize / Auto-Fill Demo Fields"** button for rapid 1-click testing, followed by the simulated 6-digit OTP confirmation.
 * **FR-P2-03 (Automatic Age- & Civil-Status-Consistent Member Data Generation):** Upon creating a mock user, the system shall automatically generate randomized, mathematically consistent records in AlloyDB covering:
   * Member profile, employer agency, salary grade, basic monthly salary, **creditable service duration (bounded accurately by the user's Birthday/Age)**, and **legal beneficiaries** aligned with their **Civil Status**.
   * Historical and recent monthly **contributions** (Employee 9% and Government 12% shares) + total accumulated contributions.
@@ -316,25 +319,34 @@ sequenceDiagram
   * A chronological list of **recent transactions** (premium remittances, loan deductions, dividend credits).
 * **FR-P2-04 (Profile Inspector Drawer for Demo Transparency):** In the demo UI, logged-in users shall have access to a collapsible **"My Mock GSIS Record (Database View)"** drawer so evaluators can visually verify that the chatbot's answers match the underlying AlloyDB records 100%.
 
-### 9.3 Phase 2: Personal Data Query & Multi-Agent MCP Requirements
+### 9.3 Phase 2: Personal Data Query, Deterministic MCP Simulation & "Coming Soon!" Action Hand-Off
 * **FR-P2-05 (Contribution & Service Duration Queries):** Authenticated members can ask about their total accumulated contributions, breakdown of personal vs. government share, latest posted remittance month, and exact length of service / Period with Paid Premiums (PPP) duration.
 * **FR-P2-06 (Loan Portfolio & Remaining Duration Queries):** Authenticated members can ask about all active loans, outstanding balances, monthly amortization amounts, next due dates, and how many months/years remain on their loan duration.
-* **FR-P2-07 (Interactive Loan Reloan / Net Proceeds Simulation):** Authenticated members can ask *"If I apply for an MPL Flex loan today, how much will I get net of my existing loan balances?"* and the `GSIS_Loans_Computation_Agent` will invoke the MCP simulation tool to calculate gross entitlement minus outstanding loan offsets and service fees.
+* **FR-P2-07 (Deterministic Loan Reloan / Net Proceeds Simulation + Disclaimer):** Authenticated members can ask *"If I apply for an MPL Flex loan today, how much will I get net of my existing loan balances?"* and `GSIS_Loans_Computation_Agent` will invoke the deterministic MCP simulation tool to compute exact gross entitlement minus outstanding loan offsets and service fees, accompanied by the mandatory **GSIS Tentative Computation Disclaimer**.
 * **FR-P2-08 (Benefits & Retirement Projection Queries):** Authenticated members can ask when they will qualify for retirement (age 60 + minimum 15 years PPP) and view their projected Basic Monthly Pension (BMP), 5-year lump sum (Option 1), 18-month cash payment (Option 2), and Life Insurance Cash Surrender Value (CSV).
 * **FR-P2-09 (Transaction History Queries):** Authenticated members can query their latest remittances, loan payments, and disbursement reference numbers.
+* **FR-P2-10 (Read-Only + Simulation Boundary with "Coming Soon!" Transactional Action Buttons):** Phase 2 shall remain strictly non-mutating on core financial ledgers. Whenever a simulation or eligibility check is completed, the chatbot shall render contextual action buttons (e.g., **"Submit MPL Flex Application in GSIS Touch"**, **"Book APIR Video Schedule"**, **"Download Official Tentative Computation PDF"**). Clicking any transactional execution button shall display a polished **"Coming Soon! (Scheduled for Phase 3 Core SAP Transactional Integration)"** modal/toast.
+* **FR-P2-11 (Dispute Detection & Live Agent / ERF Reconciliation Hand-Off):** When a member reports unposted agency deductions or complex billing disputes, the chatbot shall explain the **Agency Electronic Remittance File (ERF)** and **Agency Authorized Officer (AAO)** reconciliation process and render a **"Connect to GSIS Contact Center (8847-4747) / File ERF Reconciliation Ticket (Coming Soon!)"** action card.
 
 ---
 
 ## 10. Non-Functional Requirements (NFRs), Model Armor Security & RA 10173 Compliance
 
-### 10.1 Omnichannel Mobile & Web UX (`NFR-UX`)
-* **Responsive Mobile-First Design:** The web application hosted on Cloud Run must render natively inside mobile viewports (`375px–430px` width for iOS/Android) as well as full desktop browsers (`1280px+`), with a built-in **Device Frame Switcher ("Mobile App View" vs. "Web Portal View")** for executive demonstrations.
-* **Rich Conversational UI & Telemetry Badges:** Responses shall support clean Markdown tables, summary cards (for loan balances and contribution totals), quick-reply suggestion chips, and an **"Agent Reasoning, MCP & Model Armor Security Trace"** badge showing:
+### 10.1 Omnichannel Dual-View Mobile & Web UX (`NFR-UX-01`)
+* **Omnichannel Dual-View Workspace:** The web application hosted on Cloud Run shall feature an interactive header switcher allowing evaluators to toggle between:
+  1. **Mode A — GSIS Touch Mobile App Simulator (`390px x 844px` iOS/Android Frame):** Displays the authentic GSIS Touch mobile app shell (eCard/UMID member card, quick balance tiles, and the integrated **GSIS Gabay AI** chat interface).
+  2. **Mode B — GSIS Web Portal View (`1280px+` Responsive Desktop Layout):** Displays the full-width myGSIS web portal interface alongside a live **Architecture, AlloyDB, MCP & Model Armor Telemetry Drawer**.
+* **Rich Conversational UI & Telemetry Badges:** Responses shall support clean Markdown tables, summary cards (for loan balances and contribution totals), quick-reply suggestion chips, *"Coming Soon!"* action buttons, and an **"Agent Reasoning, MCP & Model Armor Security Trace"** badge showing:
   * **Model Armor Inspection Verdict:** `PASS (Prompt Injection: NONE | SDP PII Leak: NONE)` or `BLOCKED (Adversarial Prompt Detected)`
   * **Sub-Agent Invoked:** e.g., `GSIS_Loans_Computation_Agent`
   * **MCP Tool Executed:** e.g., `get_member_loans(bp_number=SESSION_BOUND)`
 
-### 10.2 Defense-in-Depth AI Security: Google Cloud Model Armor & RA 10173 (`NFR-SEC`)
+### 10.2 Dual-Mode AlloyDB & Cloud Run Persistence Resilience (`NFR-DATA-01`)
+* **Dual-Mode AlloyDB Connector:** The Mock MCP Server and RAG Service shall implement a **Dual-Mode Database Adapter**:
+  * **Primary Mode:** Connects directly to **AlloyDB for PostgreSQL (`pgvector` + relational tables)** when `ALLOYDB_URI` is configured in Google Cloud Run.
+  * **Zero-Downtime Demo Fallback Mode:** Automatically falls back to an embedded/local PostgreSQL-compatible persistence engine on Cloud Run if the AlloyDB cluster is paused between executive demos to optimize cloud spend, guaranteeing **99.95% demo availability** and `<1.5s` cold-start readiness at all times.
+
+### 10.3 Defense-in-Depth AI Security: Google Cloud Model Armor & RA 10173 (`NFR-SEC`)
 
 | Security Control Layer | Google Cloud Technology | Threat Mitigated | Enforcement Action |
 | :--- | :--- | :--- | :--- |
