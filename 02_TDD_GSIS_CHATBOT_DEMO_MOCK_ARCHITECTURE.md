@@ -8,7 +8,7 @@
 | **Companion Documents** | • [01_BRD_GSIS_OMNICHANNEL_AI_CHATBOT.md](./01_BRD_GSIS_OMNICHANNEL_AI_CHATBOT.md)<br>• [03_TDD_GSIS_CHATBOT_PRODUCTION_ROLLOUT.md](./03_TDD_GSIS_CHATBOT_PRODUCTION_ROLLOUT.md) |
 | **Target Environment** | GCP Demo Sandbox (`markea-testbed-dev` / `asia-southeast1` Singapore) |
 | **Compute & Orchestration** | Google Cloud Run (Serverless Container), Google Agent Development Kit (ADK), FastAPI |
-| **AI & Security Stack** | Vertex AI (`gemini-2.5-flash` / `gemini-2.5-pro`), `text-embedding-004`, **Google Cloud Model Armor** |
+| **AI & Security Stack** | Vertex AI (`gemini-3.7-flash` / `gemini-3.1-pro`), `text-embedding-004`, **Google Cloud Model Armor** |
 | **Database & MCP Layer** | **AlloyDB for PostgreSQL (`pgvector`)** with Automatic Cloud Run Persistent Fallback Adapter + **Mock MCP Server** |
 | **Author / Lead Architect** | Mark Earvin Sarmiento (Google Cloud Architecture Team) |
 | **Date** | September 23, 2026 |
@@ -57,7 +57,7 @@ flowchart TB
     subgraph CloudRun["Google Cloud Run (markea-testbed-dev / asia-southeast1)"]
         FastAPI["FastAPI Application & Auth Gateway\n• /api/auth/login & /api/auth/register-mock\n• /api/auth/verify-otp (Simulated 6-Digit OTP)\n• JWT Signer & Server-Side Identity Injector"]
         MA_Gate["Google Cloud Model Armor Middleware\n• sanitizeUserPrompt (PI / Jailbreak / SDP)\n• sanitizeModelResponse (PII Redaction / Safe URI)"]
-        ADK_Core["Google ADK Multi-Agent Orchestrator (Gemini 2.5 Flash)\n• Root: GSIS_Concierge_Router\n• Sub-Agent 1: GSIS_Policy_FAQ_Agent (Phase 1 & 2 RAG)\n• Sub-Agent 2: GSIS_Member_Records_Agent (Phase 2)\n• Sub-Agent 3: GSIS_Loans_Computation_Agent (Phase 2)\n• Sub-Agent 4: GSIS_Benefits_Transactions_Agent (Phase 2)"]
+        ADK_Core["Google ADK Multi-Agent Orchestrator (Gemini 3.7 Flash / Gemini 3.1 Pro)\n• Root: GSIS_Concierge_Router\n• Sub-Agent 1: GSIS_Policy_FAQ_Agent (Phase 1 & 2 RAG)\n• Sub-Agent 2: GSIS_Member_Records_Agent (Phase 2)\n• Sub-Agent 3: GSIS_Loans_Computation_Agent (Phase 2)\n• Sub-Agent 4: GSIS_Benefits_Transactions_Agent (Phase 2)"]
         MCP_Srv["GSIS Mock MCP Server & Deterministic Calculators\n• /mcp/tools/get_member_profile\n• /mcp/tools/get_contributions_summary\n• /mcp/tools/get_member_loans\n• /mcp/tools/simulate_loan_application\n• /mcp/tools/get_benefits_and_eligibility\n• /mcp/tools/get_recent_transactions"]
         DB_Adapter["Dual-Mode AlloyDB Persistence Adapter"]
     end
@@ -349,7 +349,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart TD
-    Root["GSIS_Concierge_Router\n(Supervisor Agent — Gemini 2.5 Flash)\n• Detects English / Tagalog / Taglish\n• Checks Auth State (Phase 1 vs Phase 2)\n• Delegates to Specialist Sub-Agents"]
+    Root["GSIS_Concierge_Router\n(Supervisor Agent — Gemini 3.7 Flash / Gemini 3.1 Pro)\n• Detects English / Tagalog / Taglish\n• Checks Auth State (Phase 1 vs Phase 2)\n• Delegates to Specialist Sub-Agents"]
     
     Root -->|"Public Rules, FAQs, Sample Math"| P1["GSIS_Policy_FAQ_Agent\n• Tool: search_gsis_faq_rag()\n• Tool: calculate_sample_loan_or_pension()"]
     Root -->|"Authenticated Profile, PPP Duration, Contributions"| P2_Rec["GSIS_Member_Records_Agent\n• MCP: get_member_profile()\n• MCP: get_contributions_summary()"]

@@ -75,7 +75,7 @@ flowchart TB
     subgraph SecurityAndAI["3. AI Security & Multi-Agent Runtime (VPC-SC Perimeter)"]
         ModelArmor["Google Cloud Model Armor + Cloud SDP (DLP)\n(Prompt Injection, Jailbreak, PII Redaction, Safe URI)"]
         ADKCluster["Multi-Agent Runtime (Cloud Run Enterprise / GKE Autopilot)\n• GSIS_Concierge_Router (Supervisor)\n• GSIS_Policy_FAQ_Agent (Phase 1 & 2)\n• GSIS_Member_Records_Agent (Phase 2)\n• GSIS_Loans_Computation_Agent (Phase 2)\n• GSIS_Benefits_Transactions_Agent (Phase 2)"]
-        VertexAI["Vertex AI Foundation Models\n(Gemini 2.5 Flash / Gemini 2.5 Pro + text-embedding-004)"]
+        VertexAI["Vertex AI Foundation Models\n(Gemini 3.7 Flash / Gemini 3.1 Pro + text-embedding-004)"]
     end
 
     subgraph DataAndKnowledge["4. High-Availability Knowledge & Session Tier"]
@@ -185,7 +185,7 @@ To satisfy the **National Privacy Commission (NPC)** under **Republic Act No. 10
 * **AlloyDB for PostgreSQL High Availability:**
   * Primary instance (`8 vCPU, 64 GB RAM`) across 2 availability zones in `asia-southeast1` + Read Pool (`2 x 4 vCPU`) for high-throughput `pgvector` FAQ RAG similarity searches.
 * **Vertex AI Provisioned Throughput / Dynamic Shared Quota (DSQ):**
-  * Uses **Gemini 2.5 Flash** for ultra-low-latency (`<1.2s` TTFT) routing and sub-agent tool synthesis, with **Provisioned Throughput** reserved during peak announcement windows.
+  * Uses **Gemini 3.7 Flash** for ultra-low-latency (`<1.2s` TTFT) routing and sub-agent tool synthesis, paired with **Gemini 3.1 Pro** for complex multi-loan/retirement reasoning, with **Provisioned Throughput** reserved during peak announcement windows.
 
 ### 9.2 OpenTelemetry (OTel) & Cloud Monitoring Alerting
 * Tracks four golden agent telemetry signals exported to **Google Cloud Monitoring**:

@@ -155,7 +155,7 @@ flowchart LR
 
 ### 7.1 High-Level Cloud, Multi-Agent & Model Armor Topology
 
-The application is designed as a cloud-native, serverless architecture on **Google Cloud Platform (`asia-southeast1` Singapore)** utilizing **Google Cloud Run**, **Google Cloud Model Armor**, **Google Agent Development Kit (ADK)** with **Gemini 2.5 Flash / Pro**, a dedicated **Model Context Protocol (MCP) Server**, and **AlloyDB for PostgreSQL**.
+The application is designed as a cloud-native, serverless architecture on **Google Cloud Platform (`asia-southeast1` Singapore)** utilizing **Google Cloud Run**, **Google Cloud Model Armor**, **Google Agent Development Kit (ADK)** with **Gemini 3.7 Flash / Gemini 3.1 Pro**, a dedicated **Model Context Protocol (MCP) Server**, and **AlloyDB for PostgreSQL**.
 
 ```mermaid
 flowchart TB
@@ -174,7 +174,7 @@ flowchart TB
         MA_Out["Model Armor Output & MCP Guard\n(sanitizeModelResponse)\n• Indirect Prompt Injection Scan (RAG/MCP)\n• Unauthorized PII / Financial Data Redaction\n• Malicious URI / Phishing Link Blocker"]
     end
 
-    subgraph MultiAgentCore["4. Multi-Agent AI System (Google ADK + Gemini 2.5)"]
+    subgraph MultiAgentCore["4. Multi-Agent AI System (Google ADK + Gemini 3.7 Flash / 3.1 Pro)"]
         Supervisor["Supervisor / Root Orchestrator Agent\n(GSIS_Concierge_Router)\n• Intent Detection & Auth Guardrail\n• English / Tagalog / Taglish Support"]
         FAQAgent["Phase 1 Sub-Agent:\nGSIS_Policy_FAQ_Agent\n(RAG Grounding & Citations)"]
         ContribAgent["Phase 2 Sub-Agent:\nGSIS_Member_Records_Agent\n(Profile, Service Duration, Contributions)"]

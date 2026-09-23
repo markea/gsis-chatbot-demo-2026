@@ -2,7 +2,7 @@
 
 **Client / Agency:** Government Service Insurance System (GSIS) – Republic of the Philippines  
 **Target Channels:** GSIS Touch Mobile App (Android / iOS) & GSIS Responsive Web Portal  
-**Target Stack:** Google Cloud Run, Vertex AI (Gemini 2.5 Flash/Pro), **Google Cloud Model Armor**, Google Agent Development Kit (ADK), Model Context Protocol (MCP), AlloyDB for PostgreSQL (`pgvector`)
+**Target Stack:** Google Cloud Run, Vertex AI (**Gemini 3.7 Flash** / **Gemini 3.1 Pro**), **Google Cloud Model Armor**, Google Agent Development Kit (ADK), Model Context Protocol (MCP), AlloyDB for PostgreSQL (`pgvector`)
 
 ---
 
