@@ -109,31 +109,43 @@ body {
   color: #0F172A;
 }
 
-/* Floating "STRICTLY DEMO ONLY" Pill when full banner is hidden */
+/* Draggable Floating "STRICTLY DEMO ONLY" Pill when full banner is hidden */
 .floating-demo-pill {
   position: fixed;
-  bottom: 24px;
-  left: 24px;
-  z-index: 1250;
+  top: 86px;
+  left: 20px;
+  z-index: 1450;
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: rgba(127, 29, 29, 0.94);
+  background: rgba(127, 29, 29, 0.95);
   backdrop-filter: blur(10px);
   color: #FEF2F2;
   border: 2px solid var(--gsis-gold);
-  padding: 9px 16px;
+  padding: 6px 12px 6px 10px;
   border-radius: 999px;
   font-size: 12px;
-  cursor: pointer;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
   box-shadow: 0 12px 30px rgba(127, 29, 29, 0.45);
-  transition: transform 0.2s, box-shadow 0.2s;
-  animation: pulseFloatingDemo 2.6s ease-in-out infinite;
+  transition: box-shadow 0.2s;
+  animation: pulseFloatingDemo 2.8s ease-in-out infinite;
 }
 
-.floating-demo-pill:hover {
-  transform: translateY(-2px) scale(1.02);
-  box-shadow: 0 16px 36px rgba(127, 29, 29, 0.6);
+.floating-demo-pill.dragging {
+  cursor: grabbing;
+  animation: none;
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.45);
+  transform: scale(1.03);
+}
+
+.floating-drag-handle {
+  font-size: 15px;
+  color: #FDE047;
+  cursor: grab;
+  padding: 0 2px;
+  opacity: 0.9;
 }
 
 .floating-demo-dot {
@@ -144,10 +156,25 @@ body {
   box-shadow: 0 0 0 3px rgba(252, 209, 22, 0.3);
 }
 
-.floating-demo-sub {
-  color: #FDE047;
-  font-weight: 600;
+.floating-demo-label {
+  cursor: pointer;
+  letter-spacing: 0.02em;
+}
+
+.floating-demo-expand-btn {
+  background: var(--gsis-gold);
+  color: #0F172A;
+  border: none;
+  padding: 3px 9px;
+  border-radius: 999px;
   font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+  margin-left: 2px;
+}
+
+.floating-demo-expand-btn:hover {
+  background: #FEF08A;
 }
 
 @keyframes pulseFloatingDemo {
@@ -210,11 +237,11 @@ body.disclaimer-hidden .chat-drawer {
   font-weight: 700;
 }
 
-/* 3. MAIN GSIS HEADER */
+/* 3. MAIN GSIS HEADER & GOOGLE-STYLE PROFILE PILL */
 .gsis-header {
   background: #FFFFFF;
   border-bottom: 1px solid var(--border-color);
-  padding: 14px 0;
+  padding: 12px 0;
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
 }
 
@@ -265,6 +292,379 @@ body.disclaimer-hidden .chat-drawer {
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+/* Google Account Style Top-Right Profile Pill */
+.google-profile-wrapper {
+  position: relative;
+}
+
+.google-profile-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px 6px 16px;
+  border-radius: 999px;
+  border: 1.5px solid #CBD5E1;
+  background: #F8FAFC;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+}
+
+.google-profile-pill:hover {
+  background: #EFF6FF;
+  border-color: var(--gsis-blue);
+  box-shadow: 0 6px 16px rgba(0, 56, 168, 0.15);
+}
+
+.google-profile-pill.auth {
+  background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
+  border: 2px solid var(--gsis-blue);
+  box-shadow: 0 4px 14px rgba(0, 56, 168, 0.18);
+}
+
+.profile-pill-text {
+  display: flex;
+  flex-direction: column;
+  text-align: right;
+}
+
+.profile-pill-phase {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: var(--gsis-blue);
+}
+
+.google-profile-pill.auth .profile-pill-phase {
+  color: #047857;
+}
+
+.profile-pill-name {
+  font-size: 13px;
+  font-weight: 800;
+  color: #0F172A;
+}
+
+.profile-avatar-circle {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #64748B;
+  color: #FFFFFF;
+  font-weight: 800;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18);
+}
+
+.profile-avatar-circle.auth {
+  background: linear-gradient(135deg, var(--gsis-blue), var(--gsis-blue-dark));
+  border: 2px solid var(--gsis-gold);
+  color: var(--gsis-gold);
+}
+
+.avatar-status-dot {
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid #FFFFFF;
+}
+
+.avatar-status-dot.unauth {
+  background: #F59E0B;
+}
+
+.avatar-status-dot.auth {
+  background: #10B981;
+}
+
+.profile-caret {
+  font-size: 12px;
+  color: #475569;
+}
+
+/* Chat Drawer Header User Profile Chip */
+.chat-user-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1.5px solid rgba(252, 209, 22, 0.65);
+  color: #FFFFFF;
+  padding: 4px 10px 4px 6px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.chat-user-chip:hover {
+  background: rgba(252, 209, 22, 0.25);
+}
+
+.chat-user-chip.auth {
+  background: var(--gsis-gold);
+  color: #0F172A;
+  border-color: #FFFFFF;
+}
+
+.chat-user-chip-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--gsis-blue-dark);
+  color: #FFFFFF;
+  font-size: 10.5px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Google Account Switcher Popover Card */
+.google-account-popover {
+  position: fixed;
+  top: 74px;
+  right: 24px;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  background: #EEF2F9;
+  border: 1px solid #CBD5E1;
+  border-radius: 28px;
+  padding: 16px;
+  z-index: 1600;
+  box-shadow: 0 24px 54px rgba(15, 23, 42, 0.32);
+  animation: popoverFadeIn 0.18s ease-out;
+}
+
+@keyframes popoverFadeIn {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.popover-top-email {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 12px;
+}
+
+.popover-active-profile {
+  background: #FFFFFF;
+  border-radius: 20px;
+  padding: 18px 16px;
+  text-align: center;
+  margin-bottom: 10px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.popover-large-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  margin: 0 auto 10px;
+  background: #64748B;
+  color: #FFFFFF;
+  font-size: 24px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid #E2E8F0;
+}
+
+.popover-large-avatar.auth {
+  background: linear-gradient(135deg, var(--gsis-blue), var(--gsis-blue-dark));
+  color: var(--gsis-gold);
+  border: 3px solid #10B981;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.18);
+}
+
+.popover-user-fullname {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  color: #0F172A;
+  margin-bottom: 4px;
+}
+
+.popover-user-bp {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #ECFDF5;
+  color: #047857;
+  border: 1px solid #A7F3D0;
+  margin-bottom: 6px;
+}
+
+.popover-user-meta {
+  font-size: 12px;
+  color: #475569;
+  margin-bottom: 12px;
+}
+
+.popover-primary-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.btn-popover-manage {
+  background: #FFFFFF;
+  border: 1px solid #94A3B8;
+  color: var(--gsis-blue-dark);
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-popover-manage:hover {
+  background: #EFF6FF;
+  border-color: var(--gsis-blue);
+}
+
+.popover-switcher-section {
+  background: #FFFFFF;
+  border-radius: 20px;
+  padding: 10px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.popover-section-title {
+  font-size: 11px;
+  font-weight: 800;
+  color: #64748B;
+  padding: 4px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.switcher-account-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 8px 10px;
+  border-radius: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.switcher-account-row:hover {
+  background: #F1F5F9;
+}
+
+.switcher-account-row.active-persona {
+  background: #ECFDF5;
+  border-color: #6EE7B7;
+}
+
+.switcher-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: #FFFFFF;
+  font-weight: 800;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.switcher-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.switcher-info strong {
+  font-size: 12.5px;
+  color: #0F172A;
+}
+
+.switcher-info span {
+  font-size: 11px;
+  color: #475569;
+}
+
+.switcher-info small {
+  font-size: 10.5px;
+  color: #64748B;
+}
+
+.switcher-badge {
+  font-size: 10.5px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #EFF6FF;
+  color: var(--gsis-blue);
+}
+
+.switcher-account-row.active-persona .switcher-badge {
+  background: #10B981;
+  color: #FFFFFF;
+}
+
+.popover-footer-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-popover-add-account {
+  flex: 1;
+  background: #FFFFFF;
+  border: 1px solid #CBD5E1;
+  color: #0F172A;
+  padding: 10px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-popover-add-account:hover {
+  background: #F8FAFC;
+}
+
+.btn-popover-signout {
+  background: #FEE2E2;
+  border: 1px solid #FCA5A5;
+  color: #991B1B;
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.btn-popover-signout:hover {
+  background: #FECACA;
 }
 
 .session-status-box {

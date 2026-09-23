@@ -14,17 +14,132 @@ const ROTATING_NUDGES = [
 ];
 let nudgeIdx = 0;
 
+let pillWasDragged = false;
+
 document.addEventListener("DOMContentLoaded", () => {
   refreshStatusAndQuota();
+  initDraggableFloatingPill();
   if (localStorage.getItem("gsis_hide_demo_disclaimer") === "1") {
     toggleDemoDisclaimer(true);
   }
+  document.addEventListener("click", (e) => {
+    const popover = document.getElementById("googleAccountPopover");
+    const wrapper = document.getElementById("googleProfileWrapper");
+    const chatChip = document.getElementById("chatDrawerUserChip");
+    if (!popover || popover.style.display === "none") return;
+    if (
+      !popover.contains(e.target) &&
+      (!wrapper || !wrapper.contains(e.target)) &&
+      (!chatChip || !chatChip.contains(e.target))
+    ) {
+      closeUserAccountMenu();
+    }
+  });
   setInterval(() => {
     nudgeIdx = (nudgeIdx + 1) % ROTATING_NUDGES.length;
     const el = document.getElementById("rotatingNudgeText");
     if (el) el.textContent = ROTATING_NUDGES[nudgeIdx];
   }, 5500);
 });
+
+function initDraggableFloatingPill() {
+  const pill = document.getElementById("floatingDemoPill");
+  if (!pill) return;
+
+  // Restore saved position if valid
+  try {
+    const saved = JSON.parse(localStorage.getItem("gsis_floating_pill_pos") || "null");
+    if (saved && typeof saved.left === "number" && typeof saved.top === "number") {
+      const clampedLeft = Math.max(12, Math.min(window.innerWidth - 260, saved.left));
+      const clampedTop = Math.max(12, Math.min(window.innerHeight - 54, saved.top));
+      pill.style.left = `${clampedLeft}px`;
+      pill.style.top = `${clampedTop}px`;
+      pill.style.bottom = "auto";
+      pill.style.right = "auto";
+    }
+  } catch (_) {}
+
+  let isDragging = false;
+  let startX = 0;
+  let startY = 0;
+  let initialLeft = 0;
+  let initialTop = 0;
+
+  function onPointerDown(clientX, clientY, target) {
+    if (target && target.classList && target.classList.contains("floating-demo-expand-btn")) {
+      return;
+    }
+    isDragging = true;
+    pillWasDragged = false;
+    const rect = pill.getBoundingClientRect();
+    startX = clientX;
+    startY = clientY;
+    initialLeft = rect.left;
+    initialTop = rect.top;
+    pill.classList.add("dragging");
+  }
+
+  function onPointerMove(clientX, clientY) {
+    if (!isDragging) return;
+    const dx = clientX - startX;
+    const dy = clientY - startY;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+      pillWasDragged = true;
+    }
+    const maxLeft = Math.max(12, window.innerWidth - pill.offsetWidth - 12);
+    const maxTop = Math.max(12, window.innerHeight - pill.offsetHeight - 12);
+    const nextLeft = Math.max(12, Math.min(maxLeft, initialLeft + dx));
+    const nextTop = Math.max(12, Math.min(maxTop, initialTop + dy));
+
+    pill.style.left = `${nextLeft}px`;
+    pill.style.top = `${nextTop}px`;
+    pill.style.bottom = "auto";
+    pill.style.right = "auto";
+  }
+
+  function onPointerUp() {
+    if (!isDragging) return;
+    isDragging = false;
+    pill.classList.remove("dragging");
+    const rect = pill.getBoundingClientRect();
+    localStorage.setItem(
+      "gsis_floating_pill_pos",
+      JSON.stringify({ left: Math.round(rect.left), top: Math.round(rect.top) })
+    );
+  }
+
+  pill.addEventListener("mousedown", (e) => onPointerDown(e.clientX, e.clientY, e.target));
+  window.addEventListener("mousemove", (e) => onPointerMove(e.clientX, e.clientY));
+  window.addEventListener("mouseup", onPointerUp);
+
+  pill.addEventListener(
+    "touchstart",
+    (e) => {
+      if (e.touches.length === 1) {
+        onPointerDown(e.touches[0].clientX, e.touches[0].clientY, e.target);
+      }
+    },
+    { passive: true }
+  );
+  window.addEventListener(
+    "touchmove",
+    (e) => {
+      if (isDragging && e.touches.length === 1) {
+        onPointerMove(e.touches[0].clientX, e.touches[0].clientY);
+      }
+    },
+    { passive: true }
+  );
+  window.addEventListener("touchend", onPointerUp);
+}
+
+function handleFloatingPillClick() {
+  if (pillWasDragged) {
+    pillWasDragged = false;
+    return;
+  }
+  toggleDemoDisclaimer(false);
+}
 
 function toggleDemoDisclaimer(hide) {
   const banner = document.getElementById("demoDisclaimerBanner");
@@ -40,6 +155,34 @@ function toggleDemoDisclaimer(hide) {
     document.body.classList.remove("disclaimer-hidden");
     localStorage.setItem("gsis_hide_demo_disclaimer", "0");
   }
+}
+
+function toggleUserAccountMenu(e) {
+  if (e) e.stopPropagation();
+  const popover = document.getElementById("googleAccountPopover");
+  if (!popover) return;
+  if (popover.style.display === "block") {
+    closeUserAccountMenu();
+  } else {
+    popover.style.display = "block";
+  }
+}
+
+function closeUserAccountMenu() {
+  const popover = document.getElementById("googleAccountPopover");
+  if (popover) popover.style.display = "none";
+}
+
+async function switchPersonaFromMenu(username) {
+  closeUserAccountMenu();
+  await quickPersonaLogin(username);
+}
+
+function getInitials(fullName) {
+  if (!fullName) return "👤";
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 async function refreshStatusAndQuota() {
@@ -63,6 +206,9 @@ function updateQuotaUI(quota) {
 
   const heroInline = document.getElementById("heroQuotaInline");
   if (heroInline) heroInline.textContent = `${used}/${max}`;
+
+  const popoverQuota = document.getElementById("popoverQuotaInline");
+  if (popoverQuota) popoverQuota.textContent = `${used}/${max}`;
 
   const modalLabel = document.getElementById("modalQuotaCountLabel");
   if (modalLabel) modalLabel.textContent = `${used} / ${max} Used`;
@@ -491,31 +637,101 @@ async function verifySimulatedOtp() {
   }
 }
 
+function updateAccountSwitcherRows(activeUsername) {
+  const personas = [
+    { key: "maria", username: "maria.santos" },
+    { key: "juan", username: "juan.delacruz" },
+    { key: "rosa", username: "rosa.reyes" }
+  ];
+  personas.forEach((p) => {
+    const row = document.getElementById(`switcherRow_${p.key}`);
+    const badge = document.getElementById(`switcherBadge_${p.key}`);
+    if (!row || !badge) return;
+    if (activeUsername && activeUsername.toLowerCase() === p.username) {
+      row.classList.add("active-persona");
+      badge.textContent = "✓ ACTIVE";
+    } else {
+      row.classList.remove("active-persona");
+      badge.textContent = "Switch";
+    }
+  });
+}
+
 function applyAuthenticatedState() {
   if (!currentMemberClaims || !currentMemberBundle) return;
   const prof = currentMemberBundle.profile;
+  const initials = getInitials(prof.full_name);
+  const firstName = prof.full_name.split(" ")[0];
 
-  document.getElementById("sessionStatusDot").className = "status-dot auth";
-  document.getElementById("sessionPhaseLabel").textContent = `PHASE 2: MFA VERIFIED (BP ${prof.bp_number})`;
-  document.getElementById("sessionUserName").textContent = `${prof.full_name} • ${prof.position_title} (${prof.agency_code})`;
+  // 1. Update Top-Right Google-Style Profile Pill
+  const triggerBtn = document.getElementById("userProfileTriggerBtn");
+  if (triggerBtn) triggerBtn.className = "google-profile-pill auth";
 
-  document.getElementById("inspectRecordsBtn").style.display = "inline-block";
-  document.getElementById("logoutBtn").style.display = "inline-block";
-  document.getElementById("openAuthModalBtn").textContent = "🔄 Switch Persona / New Mock";
+  const avatarCircle = document.getElementById("headerAvatarCircle");
+  if (avatarCircle) avatarCircle.className = "profile-avatar-circle auth";
 
-  // Update Mobile App Simulator eCard
-  document.getElementById("touchGreeting").textContent = `Mabuhay, ${prof.full_name.split(" ")[0]}!`;
+  const avatarInitials = document.getElementById("headerAvatarInitials");
+  if (avatarInitials) avatarInitials.textContent = initials;
+
+  const statusDot = document.getElementById("sessionStatusDot");
+  if (statusDot) statusDot.className = "avatar-status-dot auth";
+
+  document.getElementById("sessionPhaseLabel").textContent = `🟢 MFA VERIFIED • BP ${prof.bp_number}`;
+  document.getElementById("sessionUserName").textContent = `${prof.full_name} (${prof.agency_code})`;
+
+  const inspectBtn = document.getElementById("inspectRecordsBtn");
+  if (inspectBtn) inspectBtn.style.display = "inline-block";
+
+  // 2. Update Chat Drawer Header User Profile Chip
+  const chatChip = document.getElementById("chatDrawerUserChip");
+  if (chatChip) chatChip.className = "chat-user-chip auth";
+  const chatChipAvatar = document.getElementById("chatChipAvatar");
+  if (chatChipAvatar) chatChipAvatar.textContent = initials;
+  const chatChipName = document.getElementById("chatChipName");
+  if (chatChipName) chatChipName.textContent = `${firstName} (BP ${prof.bp_number.slice(-4)}) ▾`;
+
+  // 3. Update Google Account Switcher Popover Card
+  const popEmail = document.getElementById("popoverTopEmail");
+  if (popEmail) popEmail.textContent = `${prof.email} • GSIS Phase 2 MFA Session`;
+
+  const popAvatar = document.getElementById("popoverLargeAvatar");
+  if (popAvatar) {
+    popAvatar.className = "popover-large-avatar auth";
+    popAvatar.textContent = initials;
+  }
+
+  const popName = document.getElementById("popoverUserFullName");
+  if (popName) popName.textContent = prof.full_name;
+
+  const popBp = document.getElementById("popoverUserBpBadge");
+  if (popBp) popBp.textContent = `🟢 BP ${prof.bp_number} • ${prof.position_title} (${prof.agency_code})`;
+
+  const popMeta = document.getElementById("popoverUserMeta");
+  if (popMeta) {
+    popMeta.textContent = `Age ${prof.age} • ${prof.civil_status} • PPP ${prof.total_ppp_years} yrs • Salary ₱${Number(prof.basic_monthly_salary).toLocaleString()}`;
+  }
+
+  const popInspect = document.getElementById("popoverInspectDbBtn");
+  if (popInspect) popInspect.style.display = "block";
+
+  const popSignOut = document.getElementById("popoverSignOutBtn");
+  if (popSignOut) popSignOut.style.display = "inline-block";
+
+  updateAccountSwitcherRows(prof.username);
+
+  // 4. Update Mobile App Simulator eCard
+  document.getElementById("touchGreeting").textContent = `Mabuhay, ${firstName}!`;
   document.getElementById("touchSub").textContent = `${prof.position_title} • ${prof.agency_name}`;
   document.getElementById("touchBpNum").textContent = `BP: ${prof.bp_number}`;
   document.getElementById("touchMemberName").textContent = prof.full_name.toUpperCase();
   document.getElementById("touchAgency").textContent = `Civil: ${prof.civil_status} (Age ${prof.age})`;
   document.getElementById("touchPpp").textContent = `PPP: ${prof.total_ppp_years} yrs`;
 
-  // Update Chat Drawer Subtitle
+  // 5. Update Chat Drawer Subtitle
   document.getElementById("chatAuthSubtitle").textContent = `Phase 2 Active: ${prof.full_name} (BP ${prof.bp_number} • JWT Bound)`;
 
   appendAssistantBubble({
-    reply: `✅ **Phase 2 MFA Session Activated for ${prof.full_name} (\`BP ${prof.bp_number}\`)**\n\nYour JWT is now cryptographically bound to **BP \`${prof.bp_number}\`** (${prof.position_title}, ${prof.agency_code} • Age ${prof.age} • ${prof.civil_status} • PPP ${prof.total_ppp_years} yrs).\n\nTry asking:\n- *"Simulate my MPL Flex reloan and show my exact net proceeds"*\n- *"Show my last 12 months GSIS contributions and unposted ERF status"*\n- *"Compute my RA 8291 Option 1 vs Option 2 retirement benefits"*`,
+    reply: `✅ **Phase 2 MFA Session Activated for ${prof.full_name} (\`BP ${prof.bp_number}\`)**\n\nYour JWT is now cryptographically bound to **BP \`${prof.bp_number}\`** (${prof.position_title}, ${prof.agency_code} • Age ${prof.age} • ${prof.civil_status} • PPP ${prof.total_ppp_years} yrs).\n\n💡 *Tip: Click your **User Profile Badge** in the top-right corner anytime to switch personas in 1 click or sign out!*\n\nTry asking:\n- *"Simulate my MPL Flex reloan and show my exact net proceeds"*\n- *"Show my last 12 months GSIS contributions and unposted ERF status"*\n- *"Compute my RA 8291 Option 1 vs Option 2 retirement benefits"*`,
     agent_trace: {
       specialist_agent: "GSIS_Concierge_Router (gemini-3.7-flash)",
       mcp_tools_called: [{ tool: "jwt_identity_binding", bp_number: prof.bp_number }]
@@ -528,13 +744,74 @@ function logoutMember() {
   currentMemberClaims = null;
   currentMemberBundle = null;
 
-  document.getElementById("sessionStatusDot").className = "status-dot unauth";
+  // Reset Top-Right Google Profile Pill
+  const triggerBtn = document.getElementById("userProfileTriggerBtn");
+  if (triggerBtn) triggerBtn.className = "google-profile-pill unauth";
+
+  const avatarCircle = document.getElementById("headerAvatarCircle");
+  if (avatarCircle) avatarCircle.className = "profile-avatar-circle unauth";
+
+  const avatarInitials = document.getElementById("headerAvatarInitials");
+  if (avatarInitials) avatarInitials.textContent = "👤";
+
+  const statusDot = document.getElementById("sessionStatusDot");
+  if (statusDot) statusDot.className = "avatar-status-dot unauth";
+
   document.getElementById("sessionPhaseLabel").textContent = "PHASE 1: PUBLIC GUEST";
-  document.getElementById("sessionUserName").textContent = "Unauthenticated Visitor (FAQ & Sample Calc)";
-  document.getElementById("inspectRecordsBtn").style.display = "none";
-  document.getElementById("logoutBtn").style.display = "none";
-  document.getElementById("openAuthModalBtn").textContent = "🔐 Member Login / Register (Phase 2)";
+  document.getElementById("sessionUserName").textContent = "Not Signed In • Click to Sign In";
+
+  const inspectBtn = document.getElementById("inspectRecordsBtn");
+  if (inspectBtn) inspectBtn.style.display = "none";
+
+  // Reset Chat Drawer User Chip
+  const chatChip = document.getElementById("chatDrawerUserChip");
+  if (chatChip) chatChip.className = "chat-user-chip unauth";
+  const chatChipAvatar = document.getElementById("chatChipAvatar");
+  if (chatChipAvatar) chatChipAvatar.textContent = "👤";
+  const chatChipName = document.getElementById("chatChipName");
+  if (chatChipName) chatChipName.textContent = "Guest ▾";
+
+  // Reset Google Account Switcher Popover
+  const popEmail = document.getElementById("popoverTopEmail");
+  if (popEmail) popEmail.textContent = "unauthenticated.guest@gsis.gov.ph (Phase 1 Public Mode)";
+
+  const popAvatar = document.getElementById("popoverLargeAvatar");
+  if (popAvatar) {
+    popAvatar.className = "popover-large-avatar unauth";
+    popAvatar.textContent = "👤";
+  }
+
+  const popName = document.getElementById("popoverUserFullName");
+  if (popName) popName.textContent = "Hi, Guest Visitor!";
+
+  const popBp = document.getElementById("popoverUserBpBadge");
+  if (popBp) popBp.textContent = "🟠 Unauthenticated Mode — FAQ & Sample Calculators Only";
+
+  const popMeta = document.getElementById("popoverUserMeta");
+  if (popMeta) popMeta.textContent = "Sign in below to bind your JWT and access personal GSIS records.";
+
+  const popInspect = document.getElementById("popoverInspectDbBtn");
+  if (popInspect) popInspect.style.display = "none";
+
+  const popSignOut = document.getElementById("popoverSignOutBtn");
+  if (popSignOut) popSignOut.style.display = "none";
+
+  updateAccountSwitcherRows(null);
+
+  // Reset Mobile Simulator eCard
+  document.getElementById("touchGreeting").textContent = "Magandang Araw, Member!";
+  document.getElementById("touchSub").textContent = "Sign in to view your Digital eCard & Loans";
+  document.getElementById("touchBpNum").textContent = "BP: 2016-XXXX-XX";
+  document.getElementById("touchMemberName").textContent = "GUEST VISITOR (PHASE 1)";
+  document.getElementById("touchAgency").textContent = "Agency: Public Guest";
+  document.getElementById("touchPpp").textContent = "PPP: -- yrs";
+
   document.getElementById("chatAuthSubtitle").textContent = "Phase 1: Unauthenticated FAQ & Sample Calculator";
+
+  appendAssistantBubble({
+    reply: "🚪 **Signed Out to Phase 1 (Public Guest Mode)**\n\nYour MFA JWT session has been cleared. You can still ask general GSIS policy questions or click the **top-right User Profile Badge** to sign back in or switch personas.",
+    agent_trace: { specialist_agent: "GSIS_Concierge_Router (gemini-3.7-flash)" }
+  });
 }
 
 function toggleRecordsDrawer() {

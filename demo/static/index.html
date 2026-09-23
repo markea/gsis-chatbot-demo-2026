@@ -31,19 +31,20 @@
     </div>
   </div>
 
-  <!-- Floating "STRICTLY DEMO ONLY" Badge (Visible when the top disclaimer widget is hidden) -->
-  <button
-    type="button"
+  <!-- Draggable Floating "STRICTLY DEMO ONLY" Badge (Visible when the top disclaimer widget is hidden) -->
+  <div
     class="floating-demo-pill"
     id="floatingDemoPill"
     style="display:none;"
-    onclick="toggleDemoDisclaimer(false)"
-    title="Click to expand the full Demo Environment Disclaimer"
+    title="Drag ⠿ to move anywhere • Click 'Show ▾' to restore top banner"
   >
+    <span class="floating-drag-handle" id="floatingDragHandle" title="Drag to reposition">⠿</span>
     <span class="floating-demo-dot"></span>
-    <strong>⚠️ STRICTLY DEMO ONLY</strong>
-    <span class="floating-demo-sub">• Synthetic Mock Data (Show ▾)</span>
-  </button>
+    <strong class="floating-demo-label" onclick="handleFloatingPillClick()">⚠️ STRICTLY DEMO ONLY</strong>
+    <button type="button" class="floating-demo-expand-btn" onclick="toggleDemoDisclaimer(false)">
+      Show ▾
+    </button>
+  </div>
 
   <!-- ===================================================================== -->
   <!-- 2. REPUBLIC OF THE PHILIPPINES / OMNICHANNEL VIEW SWITCHER BAR         -->
@@ -68,7 +69,7 @@
   </div>
 
   <!-- ===================================================================== -->
-  <!-- 3. MAIN GSIS HEADER & AUTHENTICATION BAR                              -->
+  <!-- 3. MAIN GSIS HEADER & GOOGLE-STYLE TOP-RIGHT USER PROFILE BADGE       -->
   <!-- ===================================================================== -->
   <header class="gsis-header">
     <div class="container gsis-header-inner">
@@ -81,29 +82,110 @@
       </div>
 
       <div class="gsis-header-controls">
-        <!-- Session Status Pill -->
-        <div class="session-status-box" id="sessionStatusBox">
-          <span class="status-dot unauth" id="sessionStatusDot"></span>
-          <div class="session-info">
-            <span class="session-phase-label" id="sessionPhaseLabel">PHASE 1: PUBLIC GUEST</span>
-            <span class="session-user-name" id="sessionUserName">Unauthenticated Visitor (FAQ &amp; Sample Calc)</span>
-          </div>
-        </div>
-
         <button class="btn-outline-gold" id="inspectRecordsBtn" onclick="toggleRecordsDrawer()" style="display:none;">
-          🗄️ View Seeded DB Records
+          🗄️ Seeded DB Inspector
         </button>
 
-        <button class="btn-primary-auth" id="openAuthModalBtn" onclick="openAuthModal('login')">
-          🔐 Member Login / Register (Phase 2)
-        </button>
-
-        <button class="btn-logout" id="logoutBtn" onclick="logoutMember()" style="display:none;">
-          Sign Out
-        </button>
+        <!-- Google-Style Top-Right User Profile Badge (Click to Switch / Sign Out) -->
+        <div class="google-profile-wrapper" id="googleProfileWrapper">
+          <button
+            type="button"
+            class="google-profile-pill unauth"
+            id="userProfileTriggerBtn"
+            onclick="toggleUserAccountMenu(event)"
+            aria-expanded="false"
+            title="Click to switch account, view profile, or sign out"
+          >
+            <div class="profile-pill-text">
+              <span class="profile-pill-phase" id="sessionPhaseLabel">PHASE 1: PUBLIC GUEST</span>
+              <span class="profile-pill-name" id="sessionUserName">Not Signed In • Click to Sign In</span>
+            </div>
+            <div class="profile-avatar-circle unauth" id="headerAvatarCircle">
+              <span id="headerAvatarInitials">👤</span>
+              <span class="avatar-status-dot unauth" id="sessionStatusDot"></span>
+            </div>
+            <span class="profile-caret">▾</span>
+          </button>
+        </div>
       </div>
     </div>
   </header>
+
+  <!-- ===================================================================== -->
+  <!-- GOOGLE-STYLE ACCOUNT SWITCHER POPOVER MENU (TOP-RIGHT)                -->
+  <!-- ===================================================================== -->
+  <div class="google-account-popover" id="googleAccountPopover" style="display:none;">
+    <div class="popover-top-email" id="popoverTopEmail">
+      unauthenticated.guest@gsis.gov.ph (Phase 1 Public Mode)
+    </div>
+
+    <div class="popover-active-profile">
+      <div class="popover-large-avatar unauth" id="popoverLargeAvatar">👤</div>
+      <h4 class="popover-user-fullname" id="popoverUserFullName">Hi, Guest Visitor!</h4>
+      <div class="popover-user-bp" id="popoverUserBpBadge">
+        🟠 Unauthenticated Mode — FAQ &amp; Sample Calculators Only
+      </div>
+      <div class="popover-user-meta" id="popoverUserMeta">
+        Sign in below to bind your JWT and access personal GSIS records.
+      </div>
+
+      <div class="popover-primary-actions">
+        <button type="button" class="btn-popover-manage" id="popoverInspectDbBtn" onclick="closeUserAccountMenu(); toggleRecordsDrawer();" style="display:none;">
+          🗄️ View My Seeded DB &amp; MCP Records
+        </button>
+        <button type="button" class="btn-popover-manage" id="popoverSignInModalBtn" onclick="closeUserAccountMenu(); openAuthModal('login');">
+          🔐 Open Full Sign-In / OTP Modal
+        </button>
+      </div>
+    </div>
+
+    <!-- Instant 1-Click Account Switcher List -->
+    <div class="popover-switcher-section">
+      <div class="popover-section-title">
+        <span>⚡ Instant 1-Click Switch Account (Pre-Seeded Personas)</span>
+      </div>
+
+      <button type="button" class="switcher-account-row" id="switcherRow_maria" onclick="switchPersonaFromMenu('maria.santos')">
+        <div class="switcher-avatar" style="background:#0038A8;">MS</div>
+        <div class="switcher-info">
+          <strong>Maria Clara D. Santos</strong>
+          <span>Teacher III • DepEd-NCR • BP 2016041822</span>
+          <small>₱46,725 Salary • 15 yrs PPP • 1 Unposted ERF</small>
+        </div>
+        <span class="switcher-badge" id="switcherBadge_maria">Switch</span>
+      </button>
+
+      <button type="button" class="switcher-account-row" id="switcherRow_juan" onclick="switchPersonaFromMenu('juan.delacruz')">
+        <div class="switcher-avatar" style="background:#047857;">JD</div>
+        <div class="switcher-info">
+          <strong>Juan Miguel R. Dela Cruz</strong>
+          <span>Engineer IV • DPWH • BP 2001089311</span>
+          <small>Age 60 Retiring • 34 yrs PPP • Option 1 vs 2</small>
+        </div>
+        <span class="switcher-badge" id="switcherBadge_juan">Switch</span>
+      </button>
+
+      <button type="button" class="switcher-account-row" id="switcherRow_rosa" onclick="switchPersonaFromMenu('rosa.reyes')">
+        <div class="switcher-avatar" style="background:#7C3AED;">RR</div>
+        <div class="switcher-info">
+          <strong>Rosa Elena V. Reyes</strong>
+          <span>Old-Age Pensioner • DOF • BP 1992031409</span>
+          <small>Age 67 • ₱33,962 Pension • APIR Due Oct 2026</small>
+        </div>
+        <span class="switcher-badge" id="switcherBadge_rosa">Switch</span>
+      </button>
+    </div>
+
+    <!-- Footer: Add Custom Mock Account + Sign Out -->
+    <div class="popover-footer-actions">
+      <button type="button" class="btn-popover-add-account" onclick="closeUserAccountMenu(); openAuthModal('register');">
+        ➕ Create Custom Mock Account (<span id="popoverQuotaInline">0/25</span>)
+      </button>
+      <button type="button" class="btn-popover-signout" id="popoverSignOutBtn" onclick="closeUserAccountMenu(); logoutMember();" style="display:none;">
+        🚪 Sign Out of Phase 2
+      </button>
+    </div>
+  </div>
 
   <!-- ===================================================================== -->
   <!-- 4A. MODE A: OFFICIAL GSIS WEBSITE REPLICA (DEFAULT DESKTOP VIEW)      -->
@@ -399,7 +481,10 @@
         </div>
       </div>
       <div class="chat-header-actions">
-        <button class="chat-icon-btn" onclick="openAuthModal('login')" title="Switch or Login Member">👤</button>
+        <button type="button" class="chat-user-chip unauth" id="chatDrawerUserChip" onclick="toggleUserAccountMenu(event)" title="Switch Account or Sign Out">
+          <span class="chat-user-chip-avatar" id="chatChipAvatar">👤</span>
+          <span class="chat-user-chip-name" id="chatChipName">Guest ▾</span>
+        </button>
         <button class="chat-icon-btn" onclick="closeChatDrawer()" title="Close Chat">✕</button>
       </div>
     </div>
