@@ -1,16 +1,17 @@
 # TECHNICAL DESIGN DOCUMENT (TDD #2): ENTERPRISE PRODUCTION ROLL-OUT
 ## Government Service Insurance System (GSIS) — Omnichannel Multi-Agent AI Assistant ("GSIS Gabay AI")
-### Production Architecture for 3.2M+ Members & Pensioners: GSIS Touch Native Integration, SAP/MIS Enterprise MCP Gateway, AlloyDB HA & Model Armor Enterprise
+### Production Architecture for 3.2M+ Members & Pensioners: Phases 1–2 on GEAP / Vertex AI + ADK & Phase 3 Expansion on Gemini Enterprise for CX (GECX / CX Agent Studio)
 
 | Metadata Attribute | Details |
 | :--- | :--- |
-| **Document Reference** | `GSIS-TDD-PROD-2026-v1.0` |
+| **Document Reference** | `GSIS-TDD-PROD-2026-v1.3` |
 | **Companion Documents** | • [01_BRD_GSIS_OMNICHANNEL_AI_CHATBOT.md](./01_BRD_GSIS_OMNICHANNEL_AI_CHATBOT.md)<br>• [02_TDD_GSIS_CHATBOT_DEMO_MOCK_ARCHITECTURE.md](./02_TDD_GSIS_CHATBOT_DEMO_MOCK_ARCHITECTURE.md) |
 | **Target Environment** | GSIS Production Landing Zone on Google Cloud (`asia-southeast1` Primary / `asia-east1` DR) |
 | **Target Scale** | **2.6M+ Active Government Employees** + **600,000+ Pensioners** (`5,000+` concurrent peak sessions) |
-| **Client Channels** | **GSIS Touch Mobile App** (Native Android & iOS) & **myGSIS Web Portal** |
-| **Enterprise Integrations** | GSIS Core **SAP ERP**, **Member Information System (MIS)**, **Loan Management System (LMS)**, **ERF Billing Engine**, **APIR Facial Verification API** |
-| **Security & Governance** | Cloud Armor Enterprise WAF, reCAPTCHA Enterprise, Apigee X, **Google Cloud Model Armor**, Cloud DLP, Cloud KMS HSM (CMEK), VPC Service Controls |
+| **Client Channels** | **Phases 1 & 2:** **GSIS Touch Mobile App** (Native Android & iOS) & **myGSIS Web Portal**<br>**Phase 3 (GECX):** **Voice Hotline (`8847-4747` SIP)**, **WhatsApp**, **SMS**, & **Live Contact Center Agent Desktop (`Agent Assist`)** |
+| **Core AI & CX Platforms** | **Phases 1 & 2:** Vertex AI (Gemini 3.7 Flash & 3.1 Pro), Google ADK, Model Context Protocol (MCP)<br>**Phase 3:** **[Gemini Enterprise for Customer Experience — GECX / CX Agent Studio](https://cloud.google.com/gemini-enterprise-cx?e=48754805)** (Composite Audio, Omnichannel Gateway, Action Connectors) |
+| **Enterprise Integrations** | GSIS Core **SAP ERP**, **Member Information System (MIS)**, **Loan Management System (LMS)**, **ERF Billing Engine**, **APIR Facial Verification API**, **GSIS Contact Center (`8847-4747` CCAI / SIP)** |
+| **Security & Governance** | Cloud Armor Enterprise WAF, reCAPTCHA Enterprise, Apigee X, **Google Cloud Model Armor**, **GECX Automated Parameter Redaction**, Cloud DLP, Cloud KMS HSM (CMEK), VPC Service Controls |
 | **Author / Lead Architect** | Mark Earvin Sarmiento (Google Cloud Architecture Team) |
 | **Date** | September 23, 2026 |
 
@@ -18,8 +19,8 @@
 
 ## Table of Contents
 1. [Executive Summary & Production Architectural Thesis](#1-executive-summary--production-architectural-thesis)
-2. [Delta Matrix: Demo Architecture (TDD #1) vs. Production Architecture (TDD #2)](#2-delta-matrix-demo-architecture-tdd-1-vs-production-architecture-tdd-2)
-3. [End-to-End Enterprise Production Topology](#3-end-to-end-enterprise-production-topology)
+2. [Delta Matrix: Demo (TDD #1) vs. Production Phases 1–2 (GEAP/Vertex AI) vs. Phase 3 (GECX)](#2-delta-matrix-demo-tdd-1-vs-production-phases-12-geapvertex-ai-vs-phase-3-gecx)
+3. [End-to-End Enterprise Production Topology (Phases 1 & 2 Foundation)](#3-end-to-end-enterprise-production-topology)
 4. [Omnichannel Client Integration: Native GSIS Touch (Android/iOS) & Web Portal](#4-omnichannel-client-integration-native-gsis-touch-androidios--web-portal)
 5. [Enterprise Authentication, OAuth 2.0 / OIDC & Step-Up MFA Architecture](#5-enterprise-authentication-oauth-20--oidc--step-up-mfa-architecture)
 6. [Production RAG Architecture & Policy Corpus Governance Lifecycle](#6-production-rag-architecture--policy-corpus-governance-lifecycle)
@@ -27,32 +28,41 @@
 8. [Defense-in-Depth Security: Model Armor Enterprise, VPC-SC & RA 10173 Compliance](#8-defense-in-depth-security-model-armor-enterprise-vpc-sc--ra-10173-compliance)
 9. [High Availability, Capacity Sizing, FinOps & Observability (OpenTelemetry)](#9-high-availability-capacity-sizing-finops--observability-opentelemetry)
 10. [Phased Production Roll-Out & Cutover Runbook (Phases 1, 2 & 3)](#10-phased-production-roll-out--cutover-runbook-phases-1-2--3)
+11. [Phase 3 Architecture: Transitioning & Expanding to Gemini Enterprise for CX (GECX / CX Agent Studio)](#11-phase-3-architecture-transitioning--expanding-to-gemini-enterprise-for-cx-gecx--cx-agent-studio)
 
 ---
 
 ## 1. Executive Summary & Production Architectural Thesis
 
-While **TDD #1** establishes a self-contained Cloud Run demonstration environment powered by synthetic member records in AlloyDB, **TDD #2** defines the target **Enterprise Production Architecture** for rolling out **GSIS Gabay AI** across the **GSIS Touch Mobile App (Android/iOS)** and the **GSIS Web Portal** for over **3.2 million Filipino civil servants and pensioners**.
+While **TDD #1** establishes a self-contained Cloud Run demonstration environment powered by synthetic member records in AlloyDB/SQLite, **TDD #2** defines the target **Enterprise Production Architecture** for rolling out **GSIS Gabay AI** across over **3.2 million Filipino civil servants and pensioners**.
 
 ### 1.1 Zero-Refactor Path from Demo (TDD #1) to Production (TDD #2)
 Because the Multi-Agent system in TDD #1 is built on open **Model Context Protocol (MCP)** contracts and **Google Agent Development Kit (ADK)**:
-* **The Multi-Agent Brain Remains Identical:** `GSIS_Concierge_Router`, `GSIS_Policy_FAQ_Agent`, `GSIS_Member_Records_Agent`, `GSIS_Loans_Computation_Agent`, and `GSIS_Benefits_Transactions_Agent` require **zero prompt or orchestration rewrites** when moving from Demo to Production.
-* **Contract-Compatible Backend Swap:** Only the backing data providers behind the MCP Server and Auth Gateway change—swapping the **Synthetic Data Seeder & Mock AlloyDB Tables** for **GSIS Core SAP ERP / MIS / LMS APIs** via **Apigee X** and **Dedicated/Partner Cloud Interconnect**.
+* **The Multi-Agent Brain Remains Identical:** `GSIS_Concierge_Router`, `GSIS_Policy_FAQ_Agent`, `GSIS_Member_Records_Agent`, `GSIS_Loans_Computation_Agent`, and `GSIS_Benefits_Transactions_Agent` require **zero prompt or orchestration rewrites** when moving from Demo to Production Phase 1 & Phase 2.
+* **Contract-Compatible Backend Swap:** Only the backing data providers behind the MCP Server and Auth Gateway change—swapping the **Synthetic Data Seeder & Mock Tables** for **GSIS Core SAP ERP / MIS / LMS APIs** via **Apigee X** and **Dedicated/Partner Cloud Interconnect**.
+
+### 1.2 Strategic Architectural Choice: Why GEAP / Vertex AI for Phases 1–2 and GECX for Phase 3
+A core architectural principle of the GSIS rollout is matching the right Google Cloud GenAI tier to the urgency and operational complexity of each phase:
+1. **Phases 1 & 2 on GEAP / Vertex AI + Google ADK (`Weeks 1–10`):**
+   * **Simplicity & Urgency:** GSIS requires immediate deployment of the unauthenticated FAQ assistant (Phase 1) and authenticated personal ledger/loan simulation assistant (Phase 2) inside `gsis.gov.ph` and `GSIS Touch` without being blocked by telephony SIP trunking, PBX routing, or contact center workforce retraining.
+   * **Lightweight Code-First Velocity:** Deploying the Supervisor/Router (`GSIS_Concierge_Router`) and 4 Specialist Sub-Agents on Cloud Run + Vertex AI (`gemini-3.7-flash` & `gemini-3.1-pro`) with MCP tools delivers production self-service in weeks.
+2. **Phase 3 on Gemini Enterprise for Customer Experience (`GECX / CX Agent Studio` — `Weeks 11–18`):**
+   * **When Members Need Human Escalation & Voice:** Once self-service containment is live, Phase 3 addresses the remaining complex 30–35% of interactions where members need to **talk or chat with a real human GSIS officer** (e.g., multi-agency unposted ERF billing disputes, contested survivorship claims, distressed calamity loan inquiries, or senior pensioners calling `8847-4747`).
+   * **Seamless Evolution into [GECX (`cloud.google.com/gemini-enterprise-cx`)](https://cloud.google.com/gemini-enterprise-cx?e=48754805):** Because our Phase 1–2 system already uses the **Supervisor/Router + Specialist Sub-Agent + MCP Tool** architecture, it maps 1-to-1 into **GECX CX Agent Studio**—turning `GSIS_Concierge_Router` into the **GECX Root Orchestrator**, the 4 Sub-Agents into **Specialized Playbooks**, and the 8 MCP tools into **GECX Action Connectors** without rewriting a single line of backend SAP/MCP code.
 
 ---
 
-## 2. Delta Matrix: Demo Architecture (TDD #1) vs. Production Architecture (TDD #2)
+## 2. Delta Matrix: Demo (TDD #1) vs. Production Phases 1–2 (GEAP/Vertex AI) vs. Phase 3 (GECX)
 
-| Architectural Layer | TDD #1: Executive Demo (Mock Environment) | TDD #2: Enterprise Production Roll-Out |
-| :--- | :--- | :--- |
-| **Client Channels** | Omnichannel Dual-View Web App (`GSIS Touch Mobile Simulator` + `Web Portal View`). | Native **GSIS Touch Android/iOS SDK** (WebView/SSE) + **myGSIS Web Portal** embeddable widget. |
-| **Edge & Bot Protection** | Cloud Run managed TLS ingress. | **Global Cloud Load Balancer** + **Cloud Armor Enterprise WAF** + **reCAPTCHA Enterprise**. |
-| **Identity & Authentication** | Username/Password + Mock Registration (Email, Birthday, Gender) + **Simulated On-Screen 6-Digit OTP**. | **GSIS Touch OAuth 2.0 / OIDC Biometric SSO Hand-Off** + Production SMS/Email OTP Gateway via **Apigee X**. |
-| **Multi-Agent Orchestration** | Google ADK (`GSIS_Concierge_Router` + 4 Sub-Agents) on single Cloud Run service. | Google ADK deployed on **Multi-Zone Cloud Run Enterprise / GKE Autopilot** with horizontal autoscaling (`min-instances=5`, `max-instances=200`). |
-| **AI Security Perimeter** | **Google Cloud Model Armor** (`sanitizeUserPrompt` / `sanitizeModelResponse`) + UI Trace Badge. | **Google Cloud Model Armor Enterprise** + **Cloud Sensitive Data Protection (SDP/DLP)** + **VPC Service Controls (VPC-SC)**. |
-| **Phase 1 Policy RAG** | Pre-seeded GSIS FAQ vectors in AlloyDB (`pgvector`). | **AlloyDB HA `pgvector`** + **Vertex AI Search** indexing signed GSIS Board Resolutions, Circulars & Citizen's Charter with HITL approval workflow. |
-| **Phase 2 Personal Data MCP** | **Mock MCP Server** querying synthetic member records in AlloyDB. | **Production Enterprise MCP Gateway** querying **GSIS Core SAP ERP / MIS / LMS** over **Private Service Connect (PSC) + Cloud Interconnect** with **Memorystore Redis** caching. |
-| **Phase 3 Action Buttons** | Displays **"Coming Soon! (Phase 3 Transactional Execution)"** modal. | Executes signed deep-link hand-off into **GSIS Touch Loan / APIR Transaction Screens** with pre-populated application drafts. |
+| Architectural Layer | TDD #1: Executive Demo *(Mock Environment)* | Production Phases 1 & 2 *(GEAP / Vertex AI + ADK)* | Production Phase 3 *(Gemini Enterprise for CX — GECX)* |
+| :--- | :--- | :--- | :--- |
+| **Client Channels** | Omnichannel Dual-View Web App (`GSIS Touch Mobile Simulator` + `Web Portal View`). | Native **GSIS Touch Android/iOS SDK** (WebView/SSE) + **myGSIS Web Portal** widget. | **GECX Omnichannel Gateway:** Web, GSIS Touch, **WhatsApp, SMS, & Voice Telephony (`8847-4747` SIP)** with cross-channel context continuity. |
+| **Voice & Audio Architecture** | Browser Web Speech API (Client-side STT/TTS). | Text/Rich-UI primary on Web & Mobile. | **GECX Composite Audio Architecture (Audio-to-Audio):** Native ultra-low-latency streaming (`<600ms`), natural **Taglish** accents, barge-in handling, and noise filtering. |
+| **Multi-Agent Orchestration** | Google ADK (`GSIS_Concierge_Router` + 4 Sub-Agents) on single Cloud Run service. | Google ADK on **Multi-Zone Cloud Run Enterprise / GKE Autopilot** (`min-instances=5`, `max-instances=250`). | **GECX CX Agent Studio:** Visual **Root Orchestrator** + **Specialized Playbooks** wrapping/migrating ADK agents. |
+| **AI Security & PII Redaction** | **Google Cloud Model Armor** (`sanitizeUserPrompt` / `sanitizeModelResponse`) + UI Trace Badge. | **Google Cloud Model Armor Enterprise** + **Cloud SDP (DLP)** + **VPC Service Controls**. | **Model Armor Enterprise** + **GECX Automated Parameter Redaction** (masks BP#, payouts, and PII in voice recordings & transcripts) + **VPC-SC**. |
+| **Phase 1 Policy RAG & Grounding** | Embedded 18-doc GSIS policy corpus + AlloyDB `pgvector`. | **AlloyDB HA `pgvector`** + **Vertex AI Search** with HITL publishing workflow. | **GECX Native Context Engine & Data Stores** + Google Search grounding + **Next-Best-Action** recommendation engine. |
+| **Phase 2 Personal Data MCP** | **Mock MCP Server** querying synthetic member records in SQLite/AlloyDB. | **Production Enterprise MCP Gateway** querying **GSIS Core SAP / MIS / LMS** over Cloud Interconnect. | **100% Reused via GECX Action Connectors:** Existing Phase 2 MCP functions (`get_member_profile()`, `simulate_loan_application()`) plug directly into GECX. |
+| **Human Agent Escalation & Actions** | Displays **"Coming Soon! (Phase 3)"** modal for transactions and `8847-4747` hand-off. | Read-only + tentative simulation with signed deep-links into GSIS Touch screens. | **Live Warm Escalation to Human GSIS Agents (`Agent Assist`):** Transfers chat/voice call with verified `bp_number`, AI summary, MCP ledger snapshot, plus live SAP write execution. |
 
 ---
 
@@ -200,7 +210,100 @@ To satisfy the **National Privacy Commission (NPC)** under **Republic Act No. 10
 
 | Rollout Stage | Target Timeline | Scope & Milestones | Exit / Go-Live Gate |
 | :--- | :--- | :--- | :--- |
-| **Stage 0: Executive Demo & Sandbox Validation** *(TDD #1)* | **Sprint 0 (Current)** | Deploy Cloud Run Omnichannel Demo + Age-Aware Synthetic Data Seeder + Mock MCP + Model Armor. | Executive sign-off by GSIS OPGM, ITSG, and Member Services. |
-| **Stage 1: Phase 1 Production Roll-Out (Public FAQ RAG)** | **Weeks 1–4** | Ingest official GSIS Citizen's Charter & Circulars into AlloyDB HA `pgvector`; configure Cloud Armor WAF & Model Armor; embed Phase 1 widget on `gsis.gov.ph` and GSIS Touch pre-login screen. | $\ge 95\%$ RAG evaluation score on 300 Golden GSIS FAQ test cases; CISO security sign-off. |
-| **Stage 2: Phase 2 Production Roll-Out (Authenticated Personal Queries)** | **Weeks 5–10** | Connect Production MCP Server to SAP/MIS/LMS over Cloud Interconnect + Apigee X; integrate GSIS Touch OAuth 2.0 / OTP MFA; enable live contributions, loans, benefits & transaction queries with *"Coming Soon!"* action buttons. | Zero cross-account leakage in penetration testing; $100\%$ numerical parity with GSIS Touch member screens. |
-| **Stage 3: Phase 3 Transactional Execution Activation** | **Weeks 11–16** | Upgrade *"Coming Soon!"* CTA buttons into live transactional execution flows (1-tap MPL Flex Loan Application submission, APIR schedule booking, and automated ERF reconciliation ticket creation in SAP). | Full transactional audit sign-off and biometric step-up confirmation. |
+| **Stage 0: Executive Demo & Sandbox Validation** *(TDD #1)* | **Sprint 0 (Completed)** | Deploy Cloud Run Omnichannel Demo + Age-Aware Synthetic Data Seeder + Mock MCP + Model Armor (`28/28` Golden Evals Passed). | Executive sign-off by GSIS OPGM, ITSG, and Member Services. |
+| **Stage 1: Phase 1 Production Roll-Out (Public FAQ RAG on `GEAP / Vertex AI`)** | **Weeks 1–4** | Ingest official GSIS Citizen's Charter & Circulars into AlloyDB HA `pgvector`; configure Cloud Armor WAF & Model Armor; embed Phase 1 widget on `gsis.gov.ph` and GSIS Touch pre-login screen. | $\ge 95\%$ RAG evaluation score on 300 Golden GSIS FAQ test cases; CISO security sign-off. |
+| **Stage 2: Phase 2 Production Roll-Out (Authenticated Personal Queries on `GEAP / Vertex AI + ADK + MCP`)** | **Weeks 5–10** | Connect Production MCP Server to SAP/MIS/LMS over Cloud Interconnect + Apigee X; integrate GSIS Touch OAuth 2.0 / OTP MFA; enable live contributions, loans, benefits & transaction queries. | Zero cross-account leakage in penetration testing; $100\%$ numerical parity with GSIS Touch member screens. |
+| **Stage 3A: Phase 3 GECX Omnichannel Wrapper & Human Escalation (`GECX / CX Agent Studio`)** | **Weeks 11–14** | Plug existing Phase 2 MCP Server & ADK endpoints into **[Gemini Enterprise for CX (GECX)](https://cloud.google.com/gemini-enterprise-cx?e=48754805)** via **Action Connectors**; activate **Composite Audio-to-Audio Taglish Voice (`8847-4747`)**, **WhatsApp/SMS**, and **Warm Human Agent Escalation (`Agent Assist`)**. | $<600\text{ms}$ voice turn latency; $100\%$ session & `bp_number` transfer accuracy to live GSIS Contact Center desktops. |
+| **Stage 3B: Phase 3 Visual Playbook Migration & SAP Transactional Execution (`GECX`)** | **Weeks 15–18** | Migrate routing logic into CX Agent Studio visual Playbooks and activate step-up authenticated SAP write flows (1-tap MPL Flex application submission, APIR video booking, and ERF reconciliation ticketing). | Full transactional audit sign-off, GECX Automated Parameter Redaction verification, and biometric step-up confirmation. |
+
+---
+
+## 11. Phase 3 Architecture: Transitioning & Expanding to Gemini Enterprise for CX (`GECX / CX Agent Studio`)
+
+While **Phases 1 and 2** are intentionally architected using **GEAP / Vertex AI + Google ADK** to deliver immediate, low-complexity web and mobile self-service, **Phase 3** transitions and expands the ecosystem into **[Gemini Enterprise for Customer Experience (GECX)](https://cloud.google.com/gemini-enterprise-cx?e=48754805)**—specifically **CX Agent Studio**—when GSIS integrates **live human contact center officers**, **voice telephony (`8847-4747`)**, **WhatsApp/SMS**, and **complex dispute resolution**.
+
+### 11.1 Architectural Mapping: From GEAP/ADK System to GECX (`CX Agent Studio`)
+
+Because our Phase 1–2 architecture already implements a **Supervisor/Router pattern** delegating to **Specialist Sub-Agents** and **MCP Tools**, every component maps cleanly into GECX without discarding or rewriting existing backend code:
+
+| Phase 1–2 Component (`GEAP / Vertex AI + ADK`) | Phase 3 Equivalent in `GECX (CX Agent Studio)` | Migration & Integration Mechanism |
+| :--- | :--- | :--- |
+| **`GSIS_Concierge_Router` (Supervisor)** | **GECX Root Orchestrator / Agent** | Instead of manual code routing, CX Agent Studio manages the sub-agent hierarchy visually, handling multi-turn intent shifts, sentiment distress detection, and human escalation rules dynamically. |
+| **4 Specialist Sub-Agents** (`FAQ`, `Member_Records`, `Loans_Computation`, `Benefits_Transactions`) | **Specialized Playbooks / Sub-Agents** in CX Agent Studio | Each specialist domain becomes a dedicated **CX Agent Studio Playbook** (e.g., *Loans & MPL Flex Reloan Playbook*, *RA 8291 Retirement & APIR Playbook*, *Unposted ERF Dispute Playbook*). |
+| **8 MCP Server Tools & Python Calculators** (`get_member_profile()`, `simulate_loan_application()`, etc.) | **GECX Action Connectors / Hosted MCP Hooks** | Existing Cloud Run MCP endpoints and deterministic Python calculators plug directly into CX Agent Studio via **OpenAPI / MCP Action Connectors**—**0% backend code rewrite required**. |
+| **Static RAG (`search_gsis_faq_rag`)** | **GECX Native Context Engine & Data Stores** | Connects existing AlloyDB `pgvector` / Vertex AI Search corpora directly into GECX Data Stores, adding Google Search grounding and proactive **Next-Best-Action** recommendations. |
+
+---
+
+### 11.2 End-to-End Phase 3 GECX Omnichannel, Voice & Human Escalation Topology
+
+```mermaid
+flowchart TB
+    subgraph OmniTouchpoints["1. Expanded Member Touchpoints (Omnichannel)"]
+        WebMobile["myGSIS Web & GSIS Touch App"]
+        Messaging["WhatsApp & SMS Official Channels"]
+        VoiceSIP["GSIS Voice Hotline (8847-4747)\nSIP Trunk / PSTN Telephony"]
+    end
+
+    subgraph GECXPlatform["2. Gemini Enterprise for Customer Experience (GECX / CX Agent Studio)"]
+        OmniGW["GECX Omnichannel Gateway\n• Cross-Channel Session & Context Persistence\n• Unified Member State (WhatsApp <-> Web <-> Voice)"]
+        CompAudio["GECX Composite Audio Architecture\n• Direct Audio-to-Audio Streaming (<600ms)\n• Native Taglish Voice, Barge-In & Noise Filtering\n• Emotion & Frustration Sentiment Detection"]
+        RootStudio["CX Agent Studio: Root Orchestrator\n(Visual Hierarchy & Dynamic Routing)"]
+        Playbooks["CX Agent Studio: Specialized Playbooks\n• Loans & MPL Flex Playbook\n• Retirement & APIR Playbook\n• Contributions & ERF Dispute Playbook\n• Step-Up Transactional Execution Playbook"]
+        ContextEng["GECX Context Engine & Data Stores\n(Next-Best-Action Recommendations)"]
+        ParamRedact["GECX Automated Parameter Redaction\n+ Google Cloud Model Armor Enterprise"]
+    end
+
+    subgraph HumanContactCenter["3. Live Human Agent Escalation (GSIS Contact Center)"]
+        CCAI["GSIS Contact Center Agent Desktop\n(CCAI Platform / Genesys / Avaya)"]
+        AgentAssist["GECX Agent Assist\n• Pre-Verified BP Number & Member Snapshot\n• Full Cross-Channel Chat/Call Summary\n• Real-Time Suggested Replies & Policy Citations"]
+    end
+
+    subgraph ExistingPhase2Backend["4. Reused Phase 2 Enterprise MCP & Core SAP Backend (Zero Rewrite)"]
+        ActionConn["GECX Action Connectors / Hosted MCP Client"]
+        ProdMCP["Phase 2 Production GSIS MCP Server (Cloud Run)\n• get_member_profile() • get_contributions_summary()\n• get_member_loans() • simulate_loan_application()\n• get_benefits_and_eligibility() • submit_sap_transaction()"]
+        GSIS_Core[("GSIS Core Systems via Cloud Interconnect\n(SAP ERP, MIS, LMS, APIR, AlloyDB HA)")]
+    end
+
+    WebMobile & Messaging --> OmniGW
+    VoiceSIP --> CompAudio --> OmniGW
+    OmniGW --> ParamRedact --> RootStudio
+    RootStudio <--> Playbooks
+    Playbooks <--> ContextEng
+    Playbooks -->|"Action Connector Call"| ActionConn --> ProdMCP --> GSIS_Core
+    RootStudio & Playbooks ==>|"Warm Escalation (Complex Dispute / Distress)\nPasses Verified BP#, Transcript & MCP Snapshot"| CCAI
+    CCAI <--> AgentAssist
+```
+
+---
+
+### 11.3 How GECX Addresses GSIS Phase 3 Expansion Requirements
+
+1. **🗣️ Voice & Ultra-Low Latency (`Composite Audio Architecture`):**
+   * Traditional voice bots rely on a sequential chain (`Speech-to-Text ➡️ LLM ➡️ Text-to-Speech`), introducing `2.5s–4.0s` of transcription lag that feels unnatural on telephone hotlines.
+   * **GECX Advantage:** CX Agent Studio introduces a **Composite Audio Architecture (Audio-to-Audio)** that streams audio directly to and from the multimodal Gemini model. This achieves ultra-low latency (`<600ms`), detects caller emotion/distress (e.g., an elderly pensioner worried about a suspended pension or a calamity victim), handles mid-sentence **barge-ins (interruptions)** gracefully, and filters out background noise.
+2. **💬 Multilingual & Fluid Code-Switching (`Taglish`):**
+   * Filipino civil servants and pensioners naturally blend Tagalog and English (*"Ma'am/Sir, nag-apply po ako ng MPL Flex sa WhatsApp kanina, pwede po bang i-follow up yung net proceeds ko?"*).
+   * **GECX Advantage:** GECX pairs Gemini's native code-switching fluency with natural, regionally accented audio voices so the **Taglish** voice experience on `8847-4747` sounds warm and human rather than robotic.
+3. **📱 Multi-Channel Continuity (`GECX Omnichannel Gateway`):**
+   * **GECX Advantage:** GSIS builds the Playbook logic once in CX Agent Studio and publishes it simultaneously across **Web (`gsis.gov.ph`), GSIS Touch Mobile App, WhatsApp, SMS, and Voice Telephony (`8847-4747` SIP)**.
+   * **Cross-Channel Context Persistence:** Conversational state travels with the authenticated `bp_number` / verified mobile number. If a teacher starts an MPL Flex loan simulation on WhatsApp during lunch break and calls the `8847-4747` hotline in the afternoon, the GECX voice agent greets them with full awareness: *"Welcome back, Teacher Maria! I see we were looking at your ₱286,000 MPL Flex simulation on WhatsApp earlier today—would you like to proceed with that or speak with a Loans Officer?"*
+4. **🤝 Seamless Warm Escalation to Live Human Agents (`GECX Agent Assist`):**
+   * When a conversation requires human empathy or administrative authority (e.g., reconciling an unposted agency ERF deduction with an Agency Authorized Officer [AAO], filing a survivorship appeal, or resolving an identity lock), GECX executes a **Warm Hand-Off** to a live GSIS Contact Center Agent.
+   * **Zero Repetition for the Member:** The human agent immediately sees the member's verified `bp_number`, the MCP tool outputs already fetched (`get_contributions_summary`, `get_member_loans`), a concise AI-generated summary of the conversation so far, and real-time **GECX Agent Assist** knowledge suggestions.
+5. **🛡️ Enterprise Security, Automated Parameter Redaction & Compliance:**
+   * Because GSIS handles highly sensitive pension, salary, and loan records under **Republic Act No. 10173 (Data Privacy Act of 2012)**, GECX adds **Automated Parameter Redaction** (automatically scrubbing BP numbers, CRNs, bank accounts, and pension figures from plain-text logs and call transcripts) alongside **Google Cloud Model Armor** and **VPC Service Controls (VPC-SC)**.
+
+---
+
+### 11.4 Two-Stage Zero-Disruption Migration Runbook (`ADK` $\rightarrow$ `GECX`)
+
+To ensure zero disruption to the live Phase 1 and Phase 2 services on `gsis.gov.ph` and `GSIS Touch`, the transition to GECX executes in two incremental stages:
+
+1. **Stage 3A — GECX as the Omnichannel & Voice Wrapper (`Weeks 11–14`):**
+   * Keep the existing Phase 2 Cloud Run Multi-Agent & MCP backend running unchanged.
+   * Connect GECX CX Agent Studio to the Phase 2 MCP Server and ADK API via **GECX Action Connectors**.
+   * Immediately launch **Voice (`8847-4747` Composite Audio)**, **WhatsApp/SMS**, and **Live Human Agent Escalation (`Agent Assist`)** using GECX as the omnichannel front door.
+2. **Stage 3B — Native Playbook Consolidation in CX Agent Studio (`Weeks 15–18`):**
+   * Gradually migrate the routing logic from `GSIS_Concierge_Router` into CX Agent Studio's visual low-code Playbook hierarchy so GSIS business analysts and contact center supervisors can tune escalation thresholds, voice prompts, and Next-Best-Action rules visually while continuing to invoke the exact same deterministic Python/SAP MCP tools underneath.
+

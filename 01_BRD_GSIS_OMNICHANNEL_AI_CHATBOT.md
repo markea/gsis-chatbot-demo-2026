@@ -1,15 +1,15 @@
 # BUSINESS REQUIREMENTS DOCUMENT (BRD) & TECHNICAL ARCHITECTURE SPECIFICATION
 ## Government Service Insurance System (GSIS) — Omnichannel Multi-Agent AI Assistant ("GSIS Gabay AI")
-### Phased Delivery Specification: Phase 1 (Public FAQ RAG) & Phase 2 (Authenticated Member Self-Service via MCP + AlloyDB)
+### Phased Delivery Specification: Phase 1 (Public FAQ RAG), Phase 2 (Authenticated Member Self-Service via MCP + AlloyDB) & Phase 3 (Omnichannel Voice, Live Human Agent Escalation & Transactional Execution via Gemini Enterprise for CX [GECX])
 
 | Metadata Attribute | Details |
 | :--- | :--- |
-| **Document Reference** | `GSIS-BRD-CHATBOT-2026-v1.0` |
+| **Document Reference** | `GSIS-BRD-CHATBOT-2026-v1.3` |
 | **Project Name** | GSIS Omnichannel Multi-Agent AI Assistant (*GSIS Gabay AI*) |
 | **Client / Agency** | Government Service Insurance System (GSIS) – Republic of the Philippines |
-| **Target Channels** | GSIS Touch Mobile App (Android / iOS) & GSIS Responsive Web Application |
-| **Delivery Strategy** | **Phase 1:** Unauthenticated FAQ Assistant (RAG)<br>**Phase 2:** Authenticated Personal Data & Transaction Assistant (Phase 1 + Auth + MCP + AlloyDB) |
-| **Target Infrastructure** | Google Cloud Platform (Cloud Run, Vertex AI / Gemini, **Google Cloud Model Armor**, Agent Development Kit [ADK], Model Context Protocol [MCP], AlloyDB for PostgreSQL) |
+| **Target Channels** | **Phases 1 & 2:** GSIS Touch Mobile App (Android / iOS) & GSIS Responsive Web Application<br>**Phase 3 (GECX):** Expanded to **Voice Telephony (`8847-4747` SIP)**, **WhatsApp**, **SMS**, & **Live Human Agent Desktop (CCAI / Agent Assist)** |
+| **Delivery Strategy** | **Phase 1 (GEAP / Vertex AI):** Unauthenticated FAQ Assistant (RAG)<br>**Phase 2 (GEAP / Vertex AI + ADK + MCP):** Authenticated Personal Data & Simulation Assistant<br>**Phase 3 (GECX — Gemini Enterprise for CX):** Omnichannel Voice (Audio-to-Audio), Warm Human Agent Escalation & Complex Case Resolution |
+| **Target Infrastructure** | Google Cloud Platform (Cloud Run, Vertex AI / Gemini 3.7 Flash & 3.1 Pro, **Google Cloud Model Armor**, Agent Development Kit [ADK], Model Context Protocol [MCP], AlloyDB for PostgreSQL, and **[Gemini Enterprise for Customer Experience — GECX / CX Agent Studio](https://cloud.google.com/gemini-enterprise-cx?e=48754805)**) |
 | **Security Classification** | CONFIDENTIAL — FOR INTERNAL & EXECUTIVE DEMO USE |
 | **Author / Architect** | Mark Earvin Sarmiento (Google Cloud Architecture Team) |
 | **Date** | September 23, 2026 |
@@ -21,11 +21,11 @@
 2. [Executive Summary & Strategic Context](#2-executive-summary--strategic-context)
 3. [Business Problem Statement & Operational Drivers](#3-business-problem-statement--operational-drivers)
 4. [Business Objectives, KPIs & Target SLAs](#4-business-objectives-kpis--target-slas)
-5. [Phased Delivery Strategy (Phase 1 vs. Phase 2)](#5-phased-delivery-strategy-phase-1-vs-phase-2)
+5. [Phased Delivery Strategy (Phase 1 & 2 on GEAP/Vertex AI $\rightarrow$ Phase 3 on GECX)](#5-phased-delivery-strategy-phase-1--2-on-geapvertex-ai--phase-3-on-gecx)
 6. [Stakeholder Analysis & User Personas](#6-stakeholder-analysis--user-personas)
 7. [End-to-End System, Multi-Agent & Model Armor Architecture](#7-end-to-end-system-multi-agent--model-armor-architecture)
 8. [Data Architecture: AlloyDB Schema & Synthetic Data Generator (Demo Engine)](#8-data-architecture-alloydb-schema--synthetic-data-generator-demo-engine)
-9. [Detailed Functional Requirements (FRs)](#9-detailed-functional-requirements-frs)
+9. [Detailed Functional Requirements (FRs — Phases 1, 2 & 3 GECX)](#9-detailed-functional-requirements-frs)
 10. [Non-Functional Requirements (NFRs), Model Armor Security & RA 10173 Compliance](#10-non-functional-requirements-nfrs-model-armor-security--ra-10173-compliance)
 11. [Interactive Demo & UAT Scenarios](#11-interactive-demo--uat-scenarios)
 12. [Implementation Roadmap & Next Steps](#12-implementation-roadmap--next-steps)
@@ -41,14 +41,15 @@
 | `1.0-BASE` | 2026-09-23 | Mark Earvin Sarmiento | Complete BRD covering Phase 1 (FAQ RAG), Phase 2 (Authenticated Personal Queries via MCP + AlloyDB), Multi-Agent Architecture, and Synthetic Member Demo Engine. |
 | `1.1-SEC` | 2026-09-23 | Mark Earvin Sarmiento | Added **Google Cloud Model Armor** inline AI security guardrails (Prompt Injection, Jailbreak, SDP/DLP PII masking, and Malicious URI protection) across the Multi-Agent pipeline. |
 | `1.2-ALIGNED` | 2026-09-23 | Mark Earvin Sarmiento | Incorporated deep-dive architectural alignments: (1) Read-Only + Simulation scope with *"Coming Soon!"* transactional action buttons, (2) 100% Deterministic Python/SQL calculators (zero LLM mental math) + legal disclaimers, (3) Interactive Simulated 6-Digit OTP MFA step after Username/Password & Mock Registration, (4) Dual-Mode AlloyDB Connector for 24/7 Cloud Run demo resilience, and (5) Omnichannel Dual-View UI (*GSIS Touch Mobile Frame* + *Web Portal View* + *Live MCP/Model Armor Inspector*). |
+| `1.3-GECX` | 2026-09-23 | Mark Earvin Sarmiento | Formalized **Phase 3 Expansion & Transition to Gemini Enterprise for Customer Experience (GECX / CX Agent Studio)**: explained why **Phases 1 & 2** use **GEAP / Vertex AI + ADK** for simplicity and speed-to-market, while **Phase 3** adopts **GECX** for live human contact center escalation (`Agent Assist`), ultra-low-latency Composite Audio-to-Audio Taglish voice (`8847-4747`), cross-channel continuity (Web, Mobile, WhatsApp, SMS, SIP Telephony), and zero-rewrite MCP Action Connector integration. |
 
 ### 1.2 Stakeholder Sign-Off Matrix
 | Role | Organization | Responsibility | Status |
 | :--- | :--- | :--- | :--- |
 | **Executive Sponsor** | GSIS Office of the President and General Manager (OPGM) / ITSG | Strategic alignment & business sign-off | Pending Review |
-| **Business Owner** | GSIS Member Services & Operations Sector | FAQ policy accuracy, loan/benefit business rules | Pending Review |
-| **Information Security & Privacy** | GSIS Chief Information Security Officer (CISO) & Data Protection Officer (DPO) | RA 10173 (Data Privacy Act), Model Armor policy & MFA/OTP review | Pending Review |
-| **Lead Cloud & AI Architect** | Google Cloud | Multi-Agent ADK, Model Armor, RAG, Cloud Run, and AlloyDB MCP architecture | Prepared |
+| **Business Owner** | GSIS Member Services & Operations Sector | FAQ policy accuracy, loan/benefit business rules & Contact Center (`8847-4747`) escalation workflows | Pending Review |
+| **Information Security & Privacy** | GSIS Chief Information Security Officer (CISO) & Data Protection Officer (DPO) | RA 10173 (Data Privacy Act), Model Armor policy, GECX Parameter Redaction & MFA/OTP review | Pending Review |
+| **Lead Cloud & AI Architect** | Google Cloud | Multi-Agent ADK, GECX (CX Agent Studio), Model Armor, RAG, Cloud Run, and AlloyDB MCP architecture | Prepared |
 
 ---
 
@@ -56,22 +57,33 @@
 
 The **Government Service Insurance System (GSIS)** serves over **2.6 million active government employees** and **600,000+ old-age and survivorship pensioners** across the Republic of the Philippines pursuant to **Republic Act No. 8291 (The GSIS Act of 1997)**. Over the past years, GSIS has significantly modernized member touchpoints through the **GSIS Touch Mobile App** (Android and iOS) and the **GSIS Web Portal**, enabling digital loan applications, Annual Pensioners' Information Revalidation (APIR), and electronic member records lookup.
 
-To further elevate member experience and deflect high-volume repetitive inquiries from contact centers and physical branch kiosks (GWAPS), GSIS requires an intelligent, conversational **Omnichannel Multi-Agent AI Chatbot** deployed across both its **Mobile Application** and **Web Application**, protected end-to-end by **Google Cloud Model Armor**.
+To further elevate member experience and deflect high-volume repetitive inquiries from contact centers and physical branch kiosks (GWAPS), GSIS requires an intelligent, conversational **Omnichannel Multi-Agent AI Chatbot** deployed across both its **Mobile Application** and **Web Application**, protected end-to-end by **Google Cloud Model Armor**, with a clear architectural runway to **Gemini Enterprise for Customer Experience (GECX)** for live contact center escalation and voice telephony.
 
-### 2.1 Phased Value Delivery
-To accelerate time-to-value while maintaining strict security governance, the deployment is structured into two distinct phases:
-1. **Phase 1 — Unauthenticated Public & Member FAQ Assistant:**
-   * Immediately accessible without login on the GSIS Web Portal and Mobile App welcome screen.
+### 2.1 Phased Value Delivery: Why GEAP / Vertex AI for Phases 1–2 and GECX for Phase 3
+To balance **immediate speed-to-value** with **long-term omnichannel contact center transformation**, the program is structured into three purposeful phases:
+
+1. **Phase 1 — Unauthenticated Public & Member FAQ Assistant (`GEAP / Vertex AI + Cloud Run`):**
+   * **Why GEAP / Vertex AI:** Designed for maximum simplicity, low operational overhead, and urgent deployment onto `gsis.gov.ph` and the `GSIS Touch` pre-login screen without waiting for telephony or contact center integration.
    * Answers general inquiries regarding GSIS membership, loan programs (MPL Flex, MPL Lite, Consolidated Loan, Emergency Loan, Policy Loan), retirement computation rules, survivorship/disability claims, maturity benefits, and documentary requirements, including **deterministic sample calculators** (zero LLM mental math).
-   * Powered by **Retrieval-Augmented Generation (RAG)** grounded strictly in official GSIS citizen charters, circulars, and FAQs, and shielded by **Google Cloud Model Armor** against jailbreaks and off-topic manipulation.
-2. **Phase 2 — Authenticated Personal Member & Pensioner Self-Service Assistant:**
-   * Encompasses all Phase 1 capabilities plus authenticated, conversational access to a member's **personal GSIS records**.
-   * Authenticates members via a **Username and Password** login flow paired with an **Interactive Simulated 6-Digit OTP (MFA)** verification step before issuing a BP-Number-bound JWT session token.
-   * Enables natural-language personal queries across **Compulsory Contributions, Credited Length of Service (Durations), Active Loans & Amortization Schedules, Deterministic Tentative Loan Eligibility, Retirement/Benefit Projections, and Recent Transactions**.
-   * Strictly enforces a **Read-Only + Tentative Simulation boundary**: when a member is ready to act (e.g., *"Apply for MPL Flex Loan"*, *"Schedule APIR Video Interview"*, or *"File ERF Remittance Reconciliation Ticket"*), the chatbot renders interactive call-to-action cards that display a **"Coming Soon! (Phase 3 Transactional Execution)"** modal—demonstrating the future end-to-end transaction vision safely.
+   * Powered by **Retrieval-Augmented Generation (RAG)** grounded strictly in official GSIS citizen charters, circulars, and FAQs, and shielded by **Google Cloud Model Armor**.
+2. **Phase 2 — Authenticated Personal Member & Pensioner Self-Service Assistant (`GEAP / Vertex AI + Google ADK + MCP + AlloyDB`):**
+   * **Why GEAP / Vertex AI + ADK + MCP:** Enables rapid, code-first orchestration of the **Supervisor/Router (`GSIS_Concierge_Router`)** and **4 Specialist Sub-Agents** connected to standardized **Model Context Protocol (MCP)** tools (`get_member_profile`, `get_member_loans`, `simulate_loan_application`, etc.) with strict JWT `bp_number` binding.
+   * Encompasses all Phase 1 capabilities plus authenticated, conversational access to a member's **personal GSIS records** (**Compulsory Contributions, Credited Length of Service [PPP], Active Loans & Amortization Schedules, Deterministic Tentative Loan Eligibility, Retirement/Benefit Projections, and Recent Transactions**).
+   * Strictly enforces a **Read-Only + Tentative Simulation boundary**: when a member needs to execute a core SAP write transaction or escalate a complex billing dispute, the chatbot renders contextual action cards pointing to **Phase 3**.
+3. **Phase 3 — Live Human Agent Escalation, Voice Telephony & Cross-Channel Continuity (`Gemini Enterprise for Customer Experience — GECX / CX Agent Studio`):**
+   * **Why Transition/Expand to GECX ([`cloud.google.com/gemini-enterprise-cx`](https://cloud.google.com/gemini-enterprise-cx?e=48754805)):** While Phases 1 & 2 resolve self-service inquiries, complex member scenarios—such as contested survivorship claims, multi-agency unposted Electronic Remittance File (ERF) reconciliation with Agency Authorized Officers (AAOs), distressed calamity victims, or pensioners preferring voice calls—require **seamless escalation to live human GSIS agents**, **low-latency voice telephony (`8847-4747`)**, and **cross-channel memory**.
+   * **Zero-Rewrite Evolution:** Because Phases 1 & 2 already follow the **Supervisor/Router + Specialist Sub-Agent + MCP Tool** pattern, the architecture maps directly into **GECX CX Agent Studio**:
+     * `GSIS_Concierge_Router` becomes the **GECX Root Orchestrator** in CX Agent Studio's visual builder.
+     * The 4 Specialist Sub-Agents become **Specialized Playbooks / Sub-Agents**.
+     * Existing Phase 2 MCP functions (`get_member_profile()`, `simulate_loan_application()`, etc.) plug directly into GECX via **Action Connectors / Hosted MCP Hooks** with **zero backend code rewrites**.
+   * **Key GECX Capabilities Unlocked in Phase 3:**
+     1. **Warm Human Agent Escalation & GECX Agent Assist:** Transfers complex chat or voice sessions directly to a live GSIS Contact Center Officer with the member's verified `bp_number`, full conversation transcript, AI-generated case summary, and real-time **Agent Assist** suggested responses.
+     2. **Composite Audio Architecture (Audio-to-Audio Voice):** Replaces high-latency `Speech-to-Text -> LLM -> Text-to-Speech` chains with direct **Audio-to-Audio** streaming, handling natural **Taglish** accents, emotional sentiment detection, barge-ins (interruptions), and background noise filtering.
+     3. **Omnichannel Gateway & Cross-Channel Context Continuity:** Deploy once in CX Agent Studio across **Web, GSIS Touch Mobile, WhatsApp, SMS, and Voice SIP (`8847-4747`)**—if a member runs an MPL Flex simulation on WhatsApp and later calls the GSIS hotline, GECX remembers the prior simulation automatically.
+     4. **Automated Parameter Redaction & Enterprise Governance:** Built-in GECX PII/parameter redaction ensures BP numbers, bank accounts, and pension payouts are masked in contact center logs and audio recordings alongside **Google Cloud Model Armor** and **VPC Service Controls**.
 
 ### 2.2 Rapid Executive Demo & Synthetic Member Data Engine
-To demonstrate both Phase 1 and Phase 2 capabilities end-to-end without requiring live production core-banking/SAP connectivity during the initial evaluation, the Demo Environment includes:
+To demonstrate both Phase 1 and Phase 2 capabilities end-to-end (and preview Phase 3 hand-offs) without requiring live production core-banking/SAP connectivity during the initial evaluation, the Demo Environment includes:
 * An **Omnichannel Dual-View Web Application** hosted on **Google Cloud Run**, allowing evaluators to toggle seamlessly between **Mode A: GSIS Touch Mobile App Simulator** (Android/iOS frame with eCard/UMID summary and embedded chat) and **Mode B: GSIS Web Portal View**, accompanied by a collapsible **Live Architecture, AlloyDB, MCP & Model Armor Inspector Drawer**.
 * A **Self-Service Mock User Registration Flow** (requiring **Email Address**, username, password, full name, **birthday**, **gender**, civil status, mobile number, and agency) + **Interactive 1-Click Simulated OTP Verification** that automatically triggers an **Age-Consistent Synthetic GSIS Member Profile Generator**.
 * A **Dual-Mode AlloyDB Connector** (`AlloyDB for PostgreSQL + pgvector` primary with automatic Cloud Run embedded/local persistence fallback) ensuring 24/7 zero-cold-start demo availability even when dedicated AlloyDB clusters are paused between executive briefings.
@@ -88,6 +100,8 @@ To demonstrate both Phase 1 and Phase 2 capabilities end-to-end without requirin
    * Filipino government workers naturally converse in a mix of English, Tagalog, and *Taglish* (e.g., *"Magkano pa po ang balance ko sa MPL Flex at kailan ang last payment duration ko?"*). Traditional keyword-based rule bots fail to parse conversational intent or multi-part financial questions.
 4. **Strict Separation Between Public Policy and Private Member Data & AI Threat Defense:**
    * Unauthenticated users must never access personal data, while authenticated users must be cryptographically restricted to their own **Business Partner (BP) Number** with zero possibility of cross-member data leakage, prompt injection, jailbreaking, or sensitive PII exfiltration—enforced via **Google Cloud Model Armor** and JWT-bound MCP execution.
+5. **Need for Context-Preserving Escalation to Human Agents (Phase 3 Driver):**
+   * When members have complex exceptions (e.g., unposted agency ERF deductions requiring AAO coordination or contested survivorship claims) and must speak with a live GSIS officer via chat or the `8847-4747` voice hotline, they currently have to repeat their BP number and issue from scratch because digital self-service and telephony queues do not share a unified conversational context.
 
 ---
 
@@ -98,45 +112,52 @@ To demonstrate both Phase 1 and Phase 2 capabilities end-to-end without requirin
 | **OBJ-01** | **Contact Center & Branch Inquiry Deflection** | **$\ge 65\%$ containment rate** for Tier-1 FAQ and basic account status inquiries | Ratio of resolved chat sessions without human agent escalation. |
 | **OBJ-02** | **Grounded Policy & FAQ Accuracy (Phase 1)** | **$\ge 95\%$ factual grounding accuracy**; **0% fabricated loan rates or policy rules** | Automated evaluation against GSIS Golden FAQ dataset with source citations. |
 | **OBJ-03** | **Real-Time Personal Data Precision (Phase 2)** | **100% deterministic match** between AlloyDB/MCP records and chatbot figures | Exact numerical verification of contributions, balances, and service durations. |
-| **OBJ-04** | **Low-Latency Omnichannel Experience** | **$\le 2.5\text{ seconds}$** Time-to-First-Token (TTFT); **$\le 4.5\text{ seconds}$** end-to-end MCP tool response | Cloud Run & Vertex AI telemetry latency percentiles (P95). |
-| **OBJ-05** | **Model Armor Security & Privacy Compliance** | **100% block rate** on known Prompt Injection / Jailbreak vectors; **Zero (0) cross-account data leaks** under RA 10173 | **Google Cloud Model Armor** telemetry logs, red-team testing & JWT-bound MCP audit logs. |
+| **OBJ-04** | **Low-Latency Omnichannel Experience** | **$\le 2.5\text{ seconds}$** TTFT (Chat); **$< 600\text{ ms}$** Audio-to-Audio voice response latency in Phase 3 GECX | Cloud Run, Vertex AI & GECX Composite Audio telemetry percentiles (P95). |
+| **OBJ-05** | **Model Armor & GECX Security Compliance** | **100% block rate** on known Prompt Injection / Jailbreak vectors; **Zero (0) cross-account data leaks** under RA 10173 | **Google Cloud Model Armor** + **GECX Parameter Redaction** audit logs. |
 | **OBJ-06** | **Seamless Demo Self-Onboarding** | **$< 15\text{ seconds}$** from Mock User Registration (Email, Birthday, Gender) to full synthetic dataset generation in AlloyDB | End-to-end registration and synthetic data seeding transaction logs. |
+| **OBJ-07** | **Zero-Repetition Human Agent Hand-Off (Phase 3 GECX)** | **$\ge 35\%$ reduction in Average Handle Time (AHT)** for escalated contact center calls/chats | GECX Agent Assist telemetry measuring pre-verified `bp_number` and AI summary delivery to human officers. |
 
 ---
 
-## 5. Phased Delivery Strategy (Phase 1 vs. Phase 2)
+## 5. Phased Delivery Strategy (Phase 1 & 2 on GEAP/Vertex AI $\rightarrow$ Phase 3 on GECX)
 
 ```mermaid
 flowchart LR
-    subgraph Phase1["PHASE 1: Unauthenticated Public & Member FAQ Bot"]
+    subgraph Phase1["PHASE 1: Unauthenticated FAQ Bot\n(GEAP / Vertex AI + Cloud Run)"]
         P1_User["Any Visitor / Member\n(No Login Required)"] --> P1_UI["Mobile Web / App Chat UI"]
         P1_UI --> P1_MA["Google Cloud Model Armor\n(Prompt Injection & Safety Filter)"]
-        P1_MA --> P1_Router["Supervisor Orchestrator Agent"]
-        P1_Router --> P1_RAG["FAQ & Policy RAG Agent"]
-        P1_RAG --> P1_Corpus[("Static GSIS FAQ & Policy Corpus\n(AlloyDB pgvector / Vertex RAG)")]
-        P1_Router -.->|"If user asks personal query:\nPrompt to Log In / Register"| P2_Login
+        P1_MA --> P1_Router["GSIS_Concierge_Router\n(ADK Supervisor)"]
+        P1_Router --> P1_RAG["GSIS_Policy_FAQ_Agent"]
+        P1_RAG --> P1_Corpus[("Official GSIS Policy Corpus\n(AlloyDB pgvector / Vertex RAG)")]
+        P1_Router -.->|"Personal query:\nPrompt to Log In"| P2_Login
     end
 
-    subgraph Phase2["PHASE 2: Authenticated Personal Data & Transaction Bot"]
-        P2_Login["GSIS Login Page\n(Username/Password or Mock Register)"] --> P2_Token["Verified Session / JWT\n(Bound to BP Number)"]
-        P2_Token --> P2_MA["Google Cloud Model Armor\n(Input/Output Sanitization + SDP/DLP)"]
-        P2_MA --> P2_Router["Supervisor Orchestrator Agent\n(Authenticated Context)"]
-        P2_Router --> P1_RAG
-        P2_Router --> P2_SubAgents["Specialist Member Agents\n(Contributions, Loans, Benefits, Transactions)"]
-        P2_SubAgents --> P2_MCP["GSIS Mock MCP Server\n(Cloud Run)"]
-        P2_MCP --> P2_DB[("AlloyDB for PostgreSQL\n(Member Profiles, Contributions, Loans, Ledger)")]
+    subgraph Phase2["PHASE 2: Authenticated Self-Service Bot\n(GEAP / Vertex AI + ADK + MCP + AlloyDB)"]
+        P2_Login["GSIS Login + 6-Digit OTP\n(JWT Bound to BP Number)"] --> P2_MA["Google Cloud Model Armor\n(Sanitization + SDP/DLP)"]
+        P2_MA --> P2_Router["GSIS_Concierge_Router\n(Authenticated Context)"]
+        P2_Router --> P2_SubAgents["4 Specialist Sub-Agents\n(Records, Loans, Benefits, FAQ)"]
+        P2_SubAgents --> P2_MCP["GSIS Enterprise MCP Server\n(8 Deterministic Tools)"]
+        P2_MCP --> P2_DB[("AlloyDB / GSIS Core SAP & LMS\n(Profiles, Contributions, Loans)")]
+        P2_SubAgents -.->|"Complex Dispute / Voice / Live Agent\nor Core Write Transaction"| P3_Gateway
+    end
+
+    subgraph Phase3["PHASE 3: Omnichannel Voice & Human Agent Escalation\n(Gemini Enterprise for CX — GECX / CX Agent Studio)"]
+        P3_Gateway["GECX Omnichannel Gateway\n(Web, Mobile, WhatsApp, SMS, 8847-4747 Voice SIP)"] --> P3_Audio["GECX Composite Audio Engine\n(Native Audio-to-Audio Taglish Voice)"]
+        P3_Gateway --> P3_Studio["CX Agent Studio Root Orchestrator\n& Specialized Playbooks"]
+        P3_Studio <-->|"Zero-Rewrite Action Connectors"| P2_MCP
+        P3_Studio -->|"Warm Escalation + Full Context\n+ Verified BP# + AI Summary"| P3_Human["Live GSIS Contact Center Agent\n(CCAI Desktop + GECX Agent Assist)"]
     end
 ```
 
-### 5.1 Phase Comparison Matrix
+### 5.1 Phase Comparison Matrix (Phases 1, 2 & 3)
 
-| Capability Dimension | Phase 1: Public FAQ Assistant | Phase 2: Authenticated Personal Assistant |
+| Capability Dimension | Phase 1: Public FAQ Assistant *(GEAP / Vertex AI)* | Phase 2: Authenticated Personal Assistant *(GEAP / Vertex AI + ADK + MCP)* | Phase 3: Omnichannel Voice & Human Agent Escalation *(GECX / CX Agent Studio)* |
 | :--- | :--- | :--- | :--- |
-| **Authentication State** | **Unauthenticated (Anonymous / Guest)** | **Authenticated (Username + Password)** + Demo Mock Registration (Email, Birthday, Gender) |
-| **AI Security Layer** | **Google Cloud Model Armor** (Blocks prompt injection, jailbreaks, and toxic/off-topic inputs) | **Google Cloud Model Armor** (Prompt injection defense + Sensitive Data Protection [SDP] PII masking + JWT-bound MCP guardrail) |
-| **Primary Data Source** | Static GSIS FAQ Knowledge Base & Policy Documents via **RAG** | **Phase 1 RAG** + Live Personal Member Records via **MCP Server & AlloyDB** |
-| **Supported Query Types** | • Loan types, interest rates, terms & eligibility rules<br>• Retirement options (RA 8291 Option 1 vs. Option 2)<br>• Life insurance, survivorship, disability & funeral claim requirements<br>• GSIS Touch enrollment, APIR schedule, GWAPS kiosk guides | • **All Phase 1 queries**, PLUS:<br>• Personal profile, Age, Agency, Salary Grade, and **Creditable Service Duration**<br>• Monthly **Compulsory Contributions** (Personal & Government share) & totals<br>• **Active Loans** (MPL Flex, Conso-Loan, Emergency Loan), balances, amortization, & remaining duration<br>• **Benefits & Tentative Retirement/CSV Computations**<br>• **Recent Transactions**, remittances, and disbursement history |
-| **Handling of Personal Queries** | Politely explains that personal account access requires authentication and displays an inline **"Sign In / Create Mock Account"** action card. | Executes deterministic tool calls against the MCP Server scoped strictly to the logged-in user's `bp_number` / `member_id`. |
+| **Strategic Purpose & Rationale** | **Fastest Time-to-Value:** Immediate Tier-1 FAQ containment on `gsis.gov.ph` and pre-login mobile screen with minimal infrastructure complexity. | **Authenticated Self-Service:** Gives logged-in members instant, 100% deterministic answers on their personal contributions, loans, and benefits via MCP. | **Full Contact Center & Voice Transformation:** Connects digital self-service with **live human agents**, **low-latency Taglish voice (`8847-4747`)**, **WhatsApp/SMS**, and **transactional write-backs**. |
+| **Core AI Platform** | **Vertex AI (Gemini 3.7 Flash)** + **Google ADK** on **Cloud Run**. | **Vertex AI (Gemini 3.7 Flash & 3.1 Pro)** + **Google ADK** + **Cloud Run MCP Server**. | **[Gemini Enterprise for CX (GECX)](https://cloud.google.com/gemini-enterprise-cx?e=48754805)** (**CX Agent Studio** Playbooks + **Composite Audio** + **Action Connectors** plugging into Phase 2 MCP). |
+| **Supported Channels** | GSIS Web Portal & GSIS Touch Mobile App (Text Chat). | GSIS Web Portal & GSIS Touch Mobile App (Authenticated Text Chat + Rich UI Cards). | **Web, GSIS Touch App, WhatsApp, SMS, and Voice Telephony (`8847-4747` SIP)** with seamless cross-channel session memory. |
+| **AI & Data Security Layer** | **Google Cloud Model Armor** (Blocks prompt injection, jailbreaks, and toxic/off-topic inputs). | **Google Cloud Model Armor** + **Cloud SDP (DLP)** + **JWT-bound MCP guardrail**. | **Google Cloud Model Armor** + **GECX Automated Parameter Redaction** (masks PII in call recordings/transcripts) + **VPC Service Controls**. |
+| **Handling of Complex Disputes & Human Escalation** | Provides official contact info (`8847-4747` / `gsis_cares@gsis.gov.ph`). | Diagnoses issue (e.g., unposted ERF month), explains AAO process, and shows **"Coming Soon! (Phase 3)"** CTA cards. | **Live Warm Hand-Off to Human GSIS Officer:** Transfers live chat/call with full conversation history, verified `bp_number`, MCP ledger snapshot, and real-time **GECX Agent Assist** coaching. |
 
 ---
 
@@ -341,6 +362,24 @@ sequenceDiagram
 * **FR-P2-10 (Read-Only + Simulation Boundary with "Coming Soon!" Transactional Action Buttons):** Phase 2 shall remain strictly non-mutating on core financial ledgers. Whenever a simulation or eligibility check is completed, the chatbot shall render contextual action buttons (e.g., **"Submit MPL Flex Application in GSIS Touch"**, **"Book APIR Video Schedule"**, **"Download Official Tentative Computation PDF"**). Clicking any transactional execution button shall display a polished **"Coming Soon! (Scheduled for Phase 3 Core SAP Transactional Integration)"** modal/toast.
 * **FR-P2-11 (Dispute Detection & Live Agent / ERF Reconciliation Hand-Off):** When a member reports unposted agency deductions or complex billing disputes, the chatbot shall explain the **Agency Electronic Remittance File (ERF)** and **Agency Authorized Officer (AAO)** reconciliation process and render a **"Connect to GSIS Contact Center (8847-4747) / File ERF Reconciliation Ticket (Coming Soon!)"** action card.
 
+### 9.4 Phase 3: Omnichannel Voice, Warm Human Agent Escalation & Complex Case Resolution via GECX (`FR-P3-01` to `FR-P3-05`)
+While **Phases 1 & 2** are delivered using **GEAP / Vertex AI + Google ADK** for architectural simplicity and rapid self-service deployment, **Phase 3** transitions and expands the orchestration layer into **[Gemini Enterprise for Customer Experience (GECX) / CX Agent Studio](https://cloud.google.com/gemini-enterprise-cx?e=48754805)**:
+
+* **FR-P3-01 (Warm Escalation & Context Transfer to Live GSIS Contact Center Agents + `Agent Assist`):**
+  * When a member explicitly requests to speak/chat with a human officer, exhibits frustration/distress (detected via GECX sentiment analysis), or requires complex resolution (e.g., multi-agency unposted ERF remittances, contested RA 8291 survivorship claims, or disability appeals), GECX shall execute a **warm hand-off** to a live GSIS Member Services Officer.
+  * The human officer's contact center desktop (CCAI Platform / Genesys) shall automatically receive the member's **verified `bp_number`**, the complete multi-turn transcript, the MCP simulation/ledger snapshot, an **AI-generated case summary**, and real-time **GECX Agent Assist** coaching cards—eliminating the need for the member to repeat their details.
+* **FR-P3-02 (Composite Audio-to-Audio Low-Latency Taglish Voice Hotline — `8847-4747`):**
+  * Instead of high-latency sequential `Speech-to-Text -> LLM -> Text-to-Speech` pipelines, Phase 3 shall utilize GECX's **Composite Audio Architecture (Audio-to-Audio)** on the GSIS `8847-4747` voice hotline.
+  * The voice agent shall stream audio directly to/from Gemini models with native Filipino/English (**Taglish**) pronunciation, natural prosody, real-time interruption (**barge-in**) handling, emotion detection, and background noise filtering.
+* **FR-P3-03 (Omnichannel Gateway & Cross-Channel Context Continuity):**
+  * Using the **GECX Omnichannel Gateway**, GSIS shall deploy the CX Agent Studio playbooks once across **Web (`gsis.gov.ph`), GSIS Touch Mobile App, WhatsApp, SMS, and SIP Telephony (`8847-4747`)**.
+  * Conversational state and MCP tool context shall travel seamlessly across channels: if a member performs an MPL Flex loan simulation on WhatsApp or Web and subsequently calls the `8847-4747` hotline, the GECX voice agent or human officer immediately recognizes the prior simulation (*"I see we were just reviewing your ₱286,000 MPL Flex simulation earlier today..."*).
+* **FR-P3-04 (Zero-Rewrite MCP Reuse via GECX Action Connectors & Next-Best-Action Context Engine):**
+  * All Phase 2 MCP tools (`get_member_profile()`, `get_contributions_summary()`, `get_member_loans()`, `simulate_loan_application()`, `get_benefits_and_eligibility()`, `get_recent_transactions()`) shall plug directly into GECX via **Action Connectors / Hosted MCP Hooks** without rewriting backend business or database logic.
+  * GECX's native **Context Engine** and **Data Stores** shall combine internal SAP/AlloyDB member data with grounded GSIS circulars to recommend proactive **Next Best Actions** (e.g., alerting an active borrower calling about a calamity loan that their birth-month APIR or MPL Flex consolidation yields a lower monthly amortization).
+* **FR-P3-05 (GECX Automated Parameter Redaction & Enterprise Security Compliance):**
+  * In addition to **Google Cloud Model Armor** and **VPC Service Controls**, Phase 3 shall enable **GECX Automated Parameter Redaction**, ensuring sensitive member parameters (BP Numbers, Common Reference Numbers, bank account numbers, and pension payouts) are automatically redacted from plain-text contact center logs and call recordings in compliance with **RA 10173 (Data Privacy Act of 2012)**.
+
 ---
 
 ## 10. Non-Functional Requirements (NFRs), Model Armor Security & RA 10173 Compliance
@@ -415,8 +454,12 @@ The table below defines the standard executive demonstration flow for GSIS leade
    * Configure **Google Cloud Model Armor** inspection middleware (`sanitizeUserPrompt` & `sanitizeModelResponse`) + interactive security trace badges.
    * Build the **Multi-Agent Orchestrator** (`GSIS_Concierge_Router` + 4 Specialist Sub-Agents) and **Static FAQ RAG Engine**.
    * Deploy the **Mobile-Friendly Responsive Web App** (with Mobile App & Web Portal switcher) to **Google Cloud Run**.
-2. **Phase 1 Production Pilot (Weeks 1–4):**
+2. **Phase 1 Production Pilot (`GEAP / Vertex AI` — Weeks 1–4):**
    * Ingest full official GSIS Citizen's Charter, Board Resolutions, and FAQ corpus into Vertex AI Search / AlloyDB `pgvector` behind **Google Cloud Model Armor**.
-   * Embed the Phase 1 unauthenticated FAQ widget into the public GSIS Web Portal and GSIS Touch login screen.
-3. **Phase 2 Production Integration (Weeks 5–10):**
+   * Embed the Phase 1 unauthenticated FAQ widget into the public GSIS Web Portal and GSIS Touch login screen for rapid time-to-value.
+3. **Phase 2 Production Integration (`GEAP / Vertex AI + ADK + MCP` — Weeks 5–10):**
    * Replace the Mock MCP Server's AlloyDB connection with read-only enterprise API connectors to GSIS Core Systems (SAP / Member Management System) and integrate with GSIS's production Identity Provider / SSO + MFA.
+4. **Phase 3 Expansion & Transition to `Gemini Enterprise for CX (GECX)` (Weeks 11–18):**
+   * **Stage 3A (GECX Wrapper & Voice/Live Agent Activation):** Connect the existing Phase 2 MCP Server and ADK endpoints to **[GECX (CX Agent Studio)](https://cloud.google.com/gemini-enterprise-cx?e=48754805)** via **Action Connectors** to immediately unlock the **GECX Omnichannel Gateway (WhatsApp, SMS, `8847-4747` Voice SIP)**, **Composite Audio-to-Audio Taglish Voice**, and **Warm Human Agent Escalation (`Agent Assist`)** with zero backend code rewrites.
+   * **Stage 3B (CX Agent Studio Visual Playbook Migration & Transactional Execution):** Incrementally migrate the `GSIS_Concierge_Router` and 4 Specialist Sub-Agent flows into CX Agent Studio's visual low-code Playbook hierarchy and activate step-up authenticated SAP write transactions (1-tap MPL Flex loan application, APIR schedule booking, and automated ERF reconciliation ticketing).
+
