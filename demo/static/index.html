@@ -12,7 +12,7 @@
 <body>
 
   <!-- ===================================================================== -->
-  <!-- 1. MANDATORY STRICT DEMO DISCLAIMER RIBBON                             -->
+  <!-- 1. MANDATORY STRICT DEMO DISCLAIMER RIBBON + FLOATING PILL TOGGLE      -->
   <!-- ===================================================================== -->
   <div class="demo-disclaimer-banner" id="demoDisclaimerBanner">
     <div class="demo-disclaimer-inner">
@@ -24,9 +24,26 @@
         <span class="quota-header-pill" id="headerQuotaBadge" title="Hard limit of 25 custom mock user accounts">
           👥 Custom Mock Users: <strong id="headerQuotaText">0 / 25</strong>
         </span>
+        <button type="button" class="btn-toggle-disclaimer" onclick="toggleDemoDisclaimer(true)" title="Minimize full banner into a floating Strictly Demo Only badge">
+          ▲ Hide Disclaimer
+        </button>
       </div>
     </div>
   </div>
+
+  <!-- Floating "STRICTLY DEMO ONLY" Badge (Visible when the top disclaimer widget is hidden) -->
+  <button
+    type="button"
+    class="floating-demo-pill"
+    id="floatingDemoPill"
+    style="display:none;"
+    onclick="toggleDemoDisclaimer(false)"
+    title="Click to expand the full Demo Environment Disclaimer"
+  >
+    <span class="floating-demo-dot"></span>
+    <strong>⚠️ STRICTLY DEMO ONLY</strong>
+    <span class="floating-demo-sub">• Synthetic Mock Data (Show ▾)</span>
+  </button>
 
   <!-- ===================================================================== -->
   <!-- 2. REPUBLIC OF THE PHILIPPINES / OMNICHANNEL VIEW SWITCHER BAR         -->

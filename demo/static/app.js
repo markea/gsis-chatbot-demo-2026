@@ -16,12 +16,31 @@ let nudgeIdx = 0;
 
 document.addEventListener("DOMContentLoaded", () => {
   refreshStatusAndQuota();
+  if (localStorage.getItem("gsis_hide_demo_disclaimer") === "1") {
+    toggleDemoDisclaimer(true);
+  }
   setInterval(() => {
     nudgeIdx = (nudgeIdx + 1) % ROTATING_NUDGES.length;
     const el = document.getElementById("rotatingNudgeText");
     if (el) el.textContent = ROTATING_NUDGES[nudgeIdx];
   }, 5500);
 });
+
+function toggleDemoDisclaimer(hide) {
+  const banner = document.getElementById("demoDisclaimerBanner");
+  const floatingPill = document.getElementById("floatingDemoPill");
+  if (hide) {
+    if (banner) banner.style.display = "none";
+    if (floatingPill) floatingPill.style.display = "inline-flex";
+    document.body.classList.add("disclaimer-hidden");
+    localStorage.setItem("gsis_hide_demo_disclaimer", "1");
+  } else {
+    if (banner) banner.style.display = "block";
+    if (floatingPill) floatingPill.style.display = "none";
+    document.body.classList.remove("disclaimer-hidden");
+    localStorage.setItem("gsis_hide_demo_disclaimer", "0");
+  }
+}
 
 async function refreshStatusAndQuota() {
   try {
