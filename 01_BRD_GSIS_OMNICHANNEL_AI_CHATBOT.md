@@ -205,15 +205,26 @@ To power a compelling, realistic executive demo where any evaluator can either l
 ### 8.1 Authentication & Mock User Creation Workflow
 1. **Login UI (Mirrors GSIS Web/Mobile Login):**
    * Standard **Username** and **Password** login form, accompanied by quick-select demo personas (e.g., *Teacher Maria Santos — Active Member*, *Engr. Juan Dela Cruz — Near-Retiree*, *Lola Rosa Reyes — Old-Age Pensioner*) and a **"Create Mock Member Account"** tab.
-2. **Mock User Creation (Requires Email):**
-   * Input fields:
-     * **Email Address** *(Required, validated format, e.g., `evaluator@gsis.gov.ph`)*
-     * **Username** *(Required, unique)*
-     * **Password** *(Required)*
-     * **Full Name** *(Required)*
-     * **Optional Demo Preset / Randomizer Seed**: (e.g., *Random Active Employee*, *High-Tenure Employee [15+ yrs]*, *New Entrant [<3 yrs]*, or *Retiree/Pensioner*).
-3. **Automated Synthetic Data Generation Upon Sign-Up:**
-   * Immediately upon registration, the backend executes an atomic database transaction in AlloyDB that generates a complete, internally consistent GSIS dataset for that user:
+2. **Mock User Creation (Personal & GSIS Member Details):**
+   * To mirror the official **GSIS Membership Information Sheet (MIS)** and **GSIS Touch** onboarding while keeping demo sign-up effortless (supporting a **"1-Click Random Fill"** helper button), the registration form captures:
+     * **Account Credentials:**
+       * **Email Address** *(Required, validated format, e.g., `evaluator@gsis.gov.ph`)*
+       * **Username** *(Required, unique)*
+       * **Password** *(Required)*
+     * **Core Personal Details (Directly Drives GSIS Business Rules):**
+       * **Full Name** *(First Name, Middle Initial, Last Name — Required)*
+       * **Date of Birth / Birthday** *(Required — critical because GSIS retirement eligibility requires **Age 60** [Optional] or **Age 65** [Compulsory], **APIR revalidation** is scheduled every year on the member's **Birth Month**, and **Service Duration** must never exceed `Current Age - 21`)*
+       * **Gender / Sex** *(Required: `Male`, `Female`, `Prefer not to say` — used for MIS demographics and personalized honorifics)*
+       * **Civil Status** *(Recommended: `Single`, `Married`, `Widowed`, `Separated` — determines **Primary vs. Secondary Legal Beneficiaries** for GSIS Survivorship and Funeral benefits under RA 8291)*
+       * **Mobile Number** *(Recommended: `+63 9XX-XXX-XXXX` — mirrors GSIS Touch SMS/OTP notification binding)*
+     * **Employment & Demo Profile Selector (Pre-filled Dropdowns with Smart Defaults):**
+       * **Government Agency / Sector** *(e.g., `DepEd`, `DOH`, `DICT`, `LGU - Quezon City`, `SUC - UP System`, `DOJ`)*
+       * **Member Category** *(`Active Government Employee` vs. `Old-Age / Survivorship Pensioner`)*
+3. **Automated Age-Aware Synthetic Data Generation Upon Sign-Up:**
+   * Immediately upon registration, the backend executes an atomic database transaction in AlloyDB that uses the user's **Birthday**, **Gender**, **Civil Status**, and **Agency** to generate a 100% mathematically and actuarially consistent GSIS dataset:
+     * **Age-Consistent Service Duration (PPP):** Calculates current age from **Birthday** and generates a realistic `date_of_original_appointment` and `total_service_years` (e.g., if the user enters a birthday making them 30 years old, service duration is bounded to `2–8 years`; if 58 years old, service duration can be `18–32 years` to unlock retirement Option 1/Option 2 projections).
+     * **Birth-Month APIR Alignment:** Sets the member's **APIR (Annual Pensioners' Information Revalidation)** schedule month directly to their **Birthday month**.
+     * **Civil-Status Beneficiary Generation:** Auto-generates legal beneficiaries matching their **Civil Status** (e.g., legal spouse + children as primary beneficiaries if `Married`; parents/siblings if `Single`).
 
 ```mermaid
 sequenceDiagram
@@ -223,14 +234,15 @@ sequenceDiagram
     participant Auth as Auth & Seeder Service
     participant DB as AlloyDB (PostgreSQL)
 
-    Evaluator->>UI: Fills "Create Mock Account" (Email, Username, Password, Name)
+    Evaluator->>UI: Fills "Create Mock Account" (Email, Username, Password, Name, Birthday, Gender, Civil Status, Mobile, Agency)
     UI->>Auth: POST /api/auth/register-mock-user
     Auth->>Auth: Generate randomized GSIS BP Number (e.g., 2001-948271-3) & CRN
-    Auth->>Auth: Randomize Agency (DepEd/DOH/DICT/LGU), Salary Grade (SG 11–24), Service Duration (3.5–28.0 yrs)
+    Auth->>Auth: Derive Member Age from Birthday -> Bound Service Duration (PPP) & Set APIR Birth-Month
+    Auth->>Auth: Generate Legal Beneficiaries based on Civil Status & Gender
     Auth->>Auth: Compute mathematically consistent Monthly Contributions (9% EE / 12% ER) over duration
     Auth->>Auth: Generate 1–3 Active Loans (e.g., MPL Flex, Emergency Loan) with realistic balances & remaining durations
     Auth->>Auth: Compute Retirement BMP & Life Insurance CSV projections + 10 Recent Ledger Transactions
-    Auth->>DB: Commit Member Profile, Contributions, Loans, Benefits & Transactions
+    Auth->>DB: Commit Member Profile, Beneficiaries, Contributions, Loans, Benefits & Transactions
     DB-->>Auth: Transaction Confirmed
     Auth-->>UI: Issue JWT Session Token + Synthetic Profile Summary Card
     UI-->>Evaluator: Logged In (Phase 2 Active) — Ready to ask personal questions!
@@ -239,14 +251,14 @@ sequenceDiagram
 ### 8.2 AlloyDB Relational & Vector Schema Specification
 
 1. **`users_auth` & `member_profiles`**:
-   * `user_id` (UUID, PK), `username` (VARCHAR, UNIQUE), `email` (VARCHAR, UNIQUE, NOT NULL), `password_hash` (VARCHAR), `created_at` (TIMESTAMPTZ).
-   * `bp_number` (VARCHAR, UNIQUE — 10-digit GSIS Business Partner Number), `crn_number` (VARCHAR — Common Reference Number), `full_name` (VARCHAR), `birth_date` (DATE), `agency_name` (VARCHAR), `position_title` (VARCHAR), `salary_grade` (INT), `basic_monthly_salary` (NUMERIC), `employment_status` (VARCHAR: `'ACTIVE'`, `'PENSIONER'`), `date_of_original_appointment` (DATE), `total_service_years` (NUMERIC(5,2) — **Length of Service / Duration**), `periods_of_paid_premiums_months` (INT — **PPP Duration in Months**), `umid_card_status` (VARCHAR).
+   * `user_id` (UUID, PK), `username` (VARCHAR, UNIQUE), `email` (VARCHAR, UNIQUE, NOT NULL), `mobile_number` (VARCHAR), `password_hash` (VARCHAR), `created_at` (TIMESTAMPTZ).
+   * `bp_number` (VARCHAR, UNIQUE — 10-digit GSIS Business Partner Number), `crn_number` (VARCHAR — Common Reference Number), `full_name` (VARCHAR), `birth_date` (DATE — **Birthday**), `age_years` (INT), `gender` (VARCHAR: `'MALE'`, `'FEMALE'`, `'OTHER'`), `civil_status` (VARCHAR: `'SINGLE'`, `'MARRIED'`, `'WIDOWED'`, `'SEPARATED'`), `declared_beneficiaries_json` (JSONB — Primary/Secondary beneficiaries aligned with Civil Status), `agency_name` (VARCHAR), `position_title` (VARCHAR), `salary_grade` (INT), `basic_monthly_salary` (NUMERIC), `employment_status` (VARCHAR: `'ACTIVE'`, `'PENSIONER'`), `date_of_original_appointment` (DATE), `total_service_years` (NUMERIC(5,2) — **Length of Service / Duration**), `periods_of_paid_premiums_months` (INT — **PPP Duration in Months**), `umid_card_status` (VARCHAR).
 2. **`member_contributions`**:
    * `contribution_id` (UUID, PK), `bp_number` (FK), `remittance_period` (VARCHAR, e.g., `'2026-08'`), `basic_salary_base` (NUMERIC), `life_ee_share` (NUMERIC), `life_er_share` (NUMERIC), `retirement_ee_share` (NUMERIC), `retirement_er_share` (NUMERIC), `total_ee_share_9pct` (NUMERIC), `total_er_share_12pct` (NUMERIC), `ecc_share` (NUMERIC), `posting_status` (VARCHAR: `'POSTED'`, `'PENDING_REMITTANCE'`), `posted_date` (DATE).
 3. **`member_loans`**:
    * `loan_id` (UUID, PK), `bp_number` (FK), `loan_type` (VARCHAR: `'MPL_FLEX'`, `'CONSO_LOAN'`, `'EMERGENCY_LOAN'`, `'POLICY_LOAN'`, `'MPL_LITE'`), `loan_account_no` (VARCHAR), `date_granted` (DATE), `maturity_date` (DATE), `principal_amount` (NUMERIC), `interest_rate_pct` (NUMERIC), `term_months_duration` (INT — e.g., `24`, `36`, `60`, `72`), `months_paid` (INT), `months_remaining_duration` (INT), `monthly_amortization` (NUMERIC), `outstanding_balance` (NUMERIC), `loan_status` (VARCHAR: `'ACTIVE'`, `'FULLY_PAID'`), `next_due_date` (DATE).
 4. **`member_benefits_summary`**:
-   * `benefit_id` (UUID, PK), `bp_number` (FK), `life_policy_type` (VARCHAR: `'LEP'`, `'ELP'`), `policy_coverage_amount` (NUMERIC), `cash_surrender_value` (NUMERIC), `retirement_eligibility_status` (VARCHAR), `estimated_average_monthly_compensation` (NUMERIC), `estimated_basic_monthly_pension` (NUMERIC), `option1_60mo_lumpsum` (NUMERIC), `option2_18mo_cash_payment` (NUMERIC), `funeral_benefit_entitlement` (NUMERIC), `apir_status` (VARCHAR), `apir_next_due_date` (DATE).
+   * `benefit_id` (UUID, PK), `bp_number` (FK), `life_policy_type` (VARCHAR: `'LEP'`, `'ELP'`), `policy_coverage_amount` (NUMERIC), `cash_surrender_value` (NUMERIC), `retirement_eligibility_status` (VARCHAR — computed from **Age [Birthday]** + **PPP Service Duration**), `years_until_optional_retirement_60` (NUMERIC(4,1)), `years_until_compulsory_retirement_65` (NUMERIC(4,1)), `estimated_average_monthly_compensation` (NUMERIC), `estimated_basic_monthly_pension` (NUMERIC), `option1_60mo_lumpsum` (NUMERIC), `option2_18mo_cash_payment` (NUMERIC), `funeral_benefit_entitlement` (NUMERIC), `survivorship_primary_beneficiaries` (TEXT), `apir_birth_month` (VARCHAR), `apir_status` (VARCHAR), `apir_next_due_date` (DATE).
 5. **`member_transactions`**:
    * `transaction_id` (UUID, PK), `bp_number` (FK), `reference_no` (VARCHAR), `transaction_date` (TIMESTAMPTZ), `transaction_type` (VARCHAR: `'PREMIUM_REMITTANCE'`, `'LOAN_AMORTIZATION'`, `'LOAN_DISBURSEMENT'`, `'DIVIDEND_CREDIT'`, `'PENSION_DISBURSEMENT'`), `description` (TEXT), `amount` (NUMERIC), `status` (VARCHAR: `'COMPLETED'`, `'PROCESSING'`).
 6. **`gsis_faq_knowledge_vectors`** *(Phase 1 & 2 RAG Table)*:
@@ -259,7 +271,7 @@ sequenceDiagram
 ### 9.1 Phase 1: Unauthenticated Public FAQ & RAG Requirements
 * **FR-P1-01 (Zero-Auth Immediate Access):** Users opening the GSIS Web App or Mobile App chat widget shall be able to converse immediately with the chatbot without logging in.
 * **FR-P1-02 (Comprehensive GSIS FAQ RAG Coverage):** The RAG knowledge base shall answer inquiries across:
-  * **Loans:** Multi-Purpose Loan (MPL) Flex (up to 14x basic salary, up to 15 years payment term depending on PPP), MPL Lite, Consolidated Loan (Conso-Loan), Emergency Loan ( Php 20,000–40,000, 3-year term, 6% interest), and Regular/Optional Policy Loan.
+  * **Loans:** Multi-Purpose Loan (MPL) Flex (up to 14x basic salary, up to 15 years payment term depending on PPP), MPL Lite, Consolidated Loan (Conso-Loan), Emergency Loan (Php 20,000–40,000, 3-year term, 6% interest), and Regular/Optional Policy Loan.
   * **Benefits & Retirement:** RA 8291 Retirement Modes, Basic Monthly Pension ($BMP = (2.5\% \times (\text{AMC} + \text{Php } 700)) \times \text{PPP}$, capped at 90% of AMC), Separation Benefit, Unemployment Benefit, Disability, Survivorship, and Php 30,000 Funeral Benefit.
   * **Digital Services:** GSIS Touch registration, Digital ID / eCard / UMID replacement, and APIR facial recognition steps.
 * **FR-P1-03 (Citation & Grounding Attribution):** Every policy response generated by `GSIS_Policy_FAQ_Agent` shall display source badges or references to the corresponding GSIS policy guide.
@@ -267,12 +279,15 @@ sequenceDiagram
 
 ### 9.2 Phase 2: Authentication & Mock User Onboarding Requirements
 * **FR-P2-01 (Username & Password Login):** The application shall provide a clean GSIS-branded Username and Password login modal/screen matching the GSIS portal experience.
-* **FR-P2-02 (Self-Service Mock User Registration with Email):** The application shall allow users to create a new mock account by submitting a valid **Email Address**, Username, Password, and Full Name.
-* **FR-P2-03 (Automatic Randomized Member Data Generation):** Upon creating a mock user, the system shall automatically generate randomized, mathematically consistent records in AlloyDB covering:
-  * Member profile, employer agency, salary grade, basic monthly salary, and **creditable service duration** (in years and PPP months).
+* **FR-P2-02 (Self-Service Mock User Registration with Personal & Demographic Details):** The application shall allow users to create a new mock account by submitting:
+  * **Email Address** *(Required)*, **Username** *(Required)*, and **Password** *(Required)*
+  * **Full Name** *(Required)*, **Date of Birth (Birthday)** *(Required)*, and **Gender / Sex** *(Required)*
+  * **Civil Status** *(`Single`, `Married`, `Widowed`, `Separated`)*, **Mobile Number** *(`+63`)*, **Agency / Sector**, and **Membership Type** *(`Active` vs. `Pensioner`)* — with a **"Randomize / Auto-Fill Demo Fields"** button for rapid 1-click testing.
+* **FR-P2-03 (Automatic Age- & Civil-Status-Consistent Member Data Generation):** Upon creating a mock user, the system shall automatically generate randomized, mathematically consistent records in AlloyDB covering:
+  * Member profile, employer agency, salary grade, basic monthly salary, **creditable service duration (bounded accurately by the user's Birthday/Age)**, and **legal beneficiaries** aligned with their **Civil Status**.
   * Historical and recent monthly **contributions** (Employee 9% and Government 12% shares) + total accumulated contributions.
   * 1 to 3 active/historical **loans** (e.g., MPL Flex, Emergency Loan, Policy Loan) with principal, interest rate, monthly amortization, **loan duration/term**, months paid, **remaining duration**, and outstanding balance.
-  * **Benefits & claims** eligibility projections (Retirement Option 1 & Option 2 lump sums, Basic Monthly Pension, Cash Surrender Value).
+  * **Benefits & claims** eligibility projections (exact years remaining until Age 60 Optional & Age 65 Compulsory Retirement based on **Birthday**, Option 1 & Option 2 lump sums, Basic Monthly Pension, Cash Surrender Value, and **Birth-Month APIR schedule**).
   * A chronological list of **recent transactions** (premium remittances, loan deductions, dividend credits).
 * **FR-P2-04 (Profile Inspector Drawer for Demo Transparency):** In the demo UI, logged-in users shall have access to a collapsible **"My Mock GSIS Record (Database View)"** drawer so evaluators can visually verify that the chatbot's answers match the underlying AlloyDB records 100%.
 
