@@ -29,15 +29,46 @@ from .calculators import OFFICIAL_TENTATIVE_DISCLAIMER, COMING_SOON_ACTIONS
 
 
 PERSONAL_INTENT_PATTERNS = [
-    r"\bmy\s+(loan|mpl|balance|reloan|proceeds|amortization|deduction|contribution|premium|pension|retirement|benefit|beneficiar|apir|account|profile|salary|service|ppp|status|transaction|claim|unposted|erf|agency)\b",
-    r"\bhow\s+much\s+can\s+i\s+(borrow|loan|reloan|get|receive)\b",
-    r"\bam\s+i\s+(eligible|qualified)\b",
+    r"\bmy\s+(loan|loans|mpl|balance|reloan|proceeds|amortization|deduction|contribution|contributions|premium|pension|retirement|benefit|benefits|beneficiar|apir|account|profile|salary|service|ppp|status|transaction|claim|unposted|erf|agency)\b",
+    r"\bdo\s+i\s+(have|owe|qualify|need|get)\b",
+    r"\bhave\s+i\s+(got|taken|applied|paid|borrowed)\b",
+    r"\bdid\s+i\s+(take|borrow|apply|pay)\b",
+    r"\bhow\s+much\s+(can\s+i|do\s+i|is\s+my|are\s+my|have\s+i)\b",
+    r"\bam\s+i\s+(eligible|qualified|due|allowed)\b",
+    r"\bcan\s+i\s+(borrow|loan|reloan|apply|retire|claim)\b",
+    r"\b(may|meron\s+ba\s+akong|mayroon\s+ba\s+akong)\b.*\b(loan|loans|utang|balance|contribution|pension)\b",
+    r"\b(existing|active|current|outstanding)\s+loans?\b",
     r"\bcheck\s+my\b",
     r"\bshow\s+my\b",
-    r"\bwhat\s+is\s+my\b",
+    r"\bwhat\s+(is|are)\s+my\b",
     r"\bwhen\s+is\s+my\s+apir\b",
     r"\bwhy\s+is\s+my\b",
 ]
+
+
+def _is_yes_no_question(prompt: str) -> bool:
+    """Returns True if the user is asking a binary Yes/No question (e.g., 'Do I have any existing loans?')."""
+    q = prompt.strip().lower()
+    yes_no_prefixes = (
+        "do i ",
+        "do i have",
+        "have i ",
+        "did i ",
+        "am i ",
+        "is my ",
+        "are my ",
+        "can i ",
+        "do we ",
+        "is there any ",
+        "are there any ",
+        "may loan ba ako",
+        "meron ba akong",
+        "mayroon ba akong",
+        "may existing",
+    )
+    return q.startswith(yes_no_prefixes) or bool(
+        re.search(r"\b(do\s+i\s+have|have\s+i\s+got|am\s+i\s+eligible|can\s+i\s+reloan|may\s+loan\s+ba\s+ako|meron\s+ba\s+akong)\b", q)
+    )
 
 
 def _extract_salary_from_prompt(prompt: str) -> Optional[float]:
@@ -85,8 +116,26 @@ def _classify_intent(prompt: str, authenticated_bp: Optional[str]) -> Dict[str, 
         }
 
     # Authenticated Member Queries
-    if authenticated_bp and (is_personal_query or any(k in q for k in ["reloan", "balance", "ledger", "unposted", "option 1", "option 2", "apir", "beneficiar", "proceeds"])):
-        if any(k in q for k in ["loan", "mpl", "reloan", "borrow", "proceeds", "amortization", "conso", "emergency", "gfals", "calamity"]):
+    if authenticated_bp and (
+        is_personal_query
+        or any(
+            k in q
+            for k in [
+                "reloan",
+                "balance",
+                "existing loan",
+                "active loan",
+                "ledger",
+                "unposted",
+                "option 1",
+                "option 2",
+                "apir",
+                "beneficiar",
+                "proceeds",
+            ]
+        )
+    ):
+        if any(k in q for k in ["loan", "loans", "mpl", "reloan", "borrow", "proceeds", "amortization", "conso", "emergency", "gfals", "calamity"]):
             return {
                 "intent": "MEMBER_LOAN_SIMULATION_AND_BALANCES",
                 "routed_to": "GSIS_Loans_Computation_Agent",
@@ -291,7 +340,12 @@ def run_multi_agent_turn(
             )
 
         q_lower = clean_prompt.lower()
-        if "beneficiar" in q_lower and "contribut" not in q_lower:
+        is_yn = _is_yes_no_question(clean_prompt)
+        if is_yn and ("unposted" in q_lower or "missing" in q_lower):
+            short_reply_text = "🎯 **Direct Answer:** **Yes.**" if contribs["unposted_months_count"] > 0 else "🎯 **Direct Answer:** **No.**"
+        elif is_yn and ("posted" in q_lower or "complete" in q_lower or "updated" in q_lower):
+            short_reply_text = "🎯 **Direct Answer:** **Yes.**" if contribs["unposted_months_count"] == 0 else "🎯 **Direct Answer:** **No.**"
+        elif "beneficiar" in q_lower and "contribut" not in q_lower:
             short_reply_text = (
                 f"🎯 **Direct Answer:** Based on your **{profile['civil_status']}** civil status (`BP {authenticated_bp}`), "
                 f"your recognized RA 8291 legal beneficiaries are: **{' | '.join(profile.get('legal_beneficiaries', []))}**."
@@ -367,13 +421,21 @@ def run_multi_agent_turn(
 
         # Pinpoint short answer based on what the user specifically asked
         q_lower = clean_prompt.lower()
+        is_yn = _is_yes_no_question(clean_prompt)
         matched_specific_loan = None
         for l in loans_info["loans"]:
             if l["loan_id"].lower() in q_lower or (l["loan_type"] == "EMERGENCY_LOAN" and "emergency" in q_lower):
                 matched_specific_loan = l
                 break
 
-        if matched_specific_loan:
+        if is_yn and not any(w in q_lower for w in ["how much", "what is", "show", "list"]):
+            if any(w in q_lower for w in ["can i", "am i eligible", "am i qualified", "reloan"]):
+                can_reloan = sim["gaa_5000_threshold_passed"] and sim["estimated_net_proceeds"] > 0
+                short_reply_text = "🎯 **Direct Answer:** **Yes.**" if can_reloan else "🎯 **Direct Answer:** **No.**"
+            else:
+                has_loans = (matched_specific_loan is not None) if "emergency" in q_lower else (loans_info["active_loans_count"] > 0)
+                short_reply_text = "🎯 **Direct Answer:** **Yes.**" if has_loans else "🎯 **Direct Answer:** **No.**"
+        elif matched_specific_loan:
             short_reply_text = (
                 f"🎯 **Direct Answer:** Your outstanding balance for **`{matched_specific_loan['loan_type']}` (`{matched_specific_loan['loan_id']}`)** "
                 f"is **PHP {matched_specific_loan['outstanding_balance']:,.2f}** "
@@ -440,7 +502,14 @@ def run_multi_agent_turn(
         beneficiaries_str = ", ".join(benefits.get("legal_beneficiaries", []))
 
         q_lower = clean_prompt.lower()
-        if "apir" in q_lower and "option" not in q_lower and "pension" not in q_lower:
+        is_yn = _is_yes_no_question(clean_prompt)
+        if is_yn and not any(w in q_lower for w in ["how much", "what is", "show"]):
+            if "apir" in q_lower:
+                short_reply_text = "🎯 **Direct Answer:** **Yes.**" if benefits.get("apir_status") == "ACTIVE_COMPLIANT" else "🎯 **Direct Answer:** **No.**"
+            else:
+                is_retire_eligible = benefits.get("age", 0) >= 60 and calc.get("ppp_years", 0) >= 15
+                short_reply_text = "🎯 **Direct Answer:** **Yes.**" if is_retire_eligible else "🎯 **Direct Answer:** **No.**"
+        elif "apir" in q_lower and "option" not in q_lower and "pension" not in q_lower:
             short_reply_text = (
                 f"🎯 **Direct Answer:** Your **APIR Status** is **`{benefits['apir_status']}`** with a next scheduled due date of "
                 f"**`{benefits['apir_next_due_date']}`** (*{benefits['apir_birth_month_rule']}*)."
