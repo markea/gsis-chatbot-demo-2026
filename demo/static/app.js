@@ -456,8 +456,90 @@ function appendAssistantBubble(data) {
   }
 }
 
+let activeThinkingInterval = null;
+
+function showThinkingIndicator() {
+  removeThinkingIndicator();
+  const container = document.getElementById("chatMessages");
+  if (!container) return;
+
+  const row = document.createElement("div");
+  row.className = "message-row assistant thinking-indicator-row";
+  row.id = "activeThinkingBubbleRow";
+
+  const stages = [
+    "🛡️ Inspecting prompt via Google Cloud Model Armor (gsis-gabay-armor-v1)...",
+    "🤖 Routing intent via GSIS_Concierge_Router (gemini-3.7-flash)...",
+    "🔧 Invoking Specialist Agent & deterministic GSIS calculators..."
+  ];
+  let stageIdx = 0;
+
+  row.innerHTML = `
+    <div class="message-bubble thinking-bubble">
+      <div class="bubble-meta">
+        <span>🤖 <strong>GSIS Gabay AI Multi-Agent System</strong></span>
+        <span class="armor-thinking-tag">🛡️ Model Armor Inspecting</span>
+      </div>
+      <div class="thinking-body">
+        <div class="thinking-spinner" aria-hidden="true"></div>
+        <div class="thinking-text-wrap">
+          <div class="thinking-stage-label" id="thinkingStageLabel">${stages[0]}</div>
+          <div class="thinking-sub-label">
+            <span>Generating verified response</span>
+            <span class="typing-dots" aria-label="Typing"><span></span><span></span><span></span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  container.appendChild(row);
+  container.scrollTop = container.scrollHeight;
+
+  const badgeEl = document.getElementById("lastAgentBadge");
+  if (badgeEl) {
+    badgeEl.innerHTML = `⏳ Thinking: <code>Model Armor &amp; Multi-Agent Router...</code>`;
+  }
+
+  const sendBtn = document.querySelector("#chatForm button[type='submit']");
+  if (sendBtn) {
+    sendBtn.disabled = true;
+    sendBtn.dataset.origText = sendBtn.innerHTML;
+    sendBtn.innerHTML = "⏳ Thinking...";
+  }
+
+  activeThinkingInterval = setInterval(() => {
+    stageIdx = (stageIdx + 1) % stages.length;
+    const labelEl = document.getElementById("thinkingStageLabel");
+    if (labelEl) {
+      labelEl.textContent = stages[stageIdx];
+    }
+  }, 320);
+}
+
+function removeThinkingIndicator() {
+  if (activeThinkingInterval) {
+    clearInterval(activeThinkingInterval);
+    activeThinkingInterval = null;
+  }
+  const existing = document.getElementById("activeThinkingBubbleRow");
+  if (existing && existing.parentNode) {
+    existing.parentNode.removeChild(existing);
+  }
+  const sendBtn = document.querySelector("#chatForm button[type='submit']");
+  if (sendBtn) {
+    sendBtn.disabled = false;
+    if (sendBtn.dataset.origText) {
+      sendBtn.innerHTML = sendBtn.dataset.origText;
+    }
+  }
+}
+
 async function sendChatMessage(promptText) {
   appendUserBubble(promptText);
+  showThinkingIndicator();
+  const startTime = performance.now();
+  const MIN_THINKING_MS = 850;
+
   const headers = { "Content-Type": "application/json" };
   if (currentAccessToken) {
     headers["Authorization"] = `Bearer ${currentAccessToken}`;
@@ -470,8 +552,14 @@ async function sendChatMessage(promptText) {
       body: JSON.stringify({ prompt: promptText, channel: currentChannel })
     });
     const data = await res.json();
+    const elapsed = performance.now() - startTime;
+    if (elapsed < MIN_THINKING_MS) {
+      await new Promise((resolve) => setTimeout(resolve, MIN_THINKING_MS - elapsed));
+    }
+    removeThinkingIndicator();
     appendAssistantBubble(data);
   } catch (err) {
+    removeThinkingIndicator();
     appendAssistantBubble({
       reply: "⚠️ Connection error while contacting GSIS Gabay AI backend.",
       agent_trace: { specialist_agent: "System" }
