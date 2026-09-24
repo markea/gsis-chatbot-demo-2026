@@ -14,7 +14,12 @@ import re
 import time
 from typing import Dict, Any, List, Optional
 
-from .model_armor import sanitize_user_prompt, sanitize_model_response
+from .model_armor import (
+    sanitize_user_prompt,
+    sanitize_model_response,
+    enforce_agent_model_armor_guard,
+    ALL_MULTI_AGENT_NAMES,
+)
 from .mcp_server import (
     search_gsis_faq_rag,
     calculate_sample_loan_or_pension,
@@ -190,32 +195,63 @@ def run_multi_agent_turn(
     """
     turn_start = time.perf_counter()
 
-    # Step 1: Google Cloud Model Armor Input Inspection
-    armor_in = sanitize_user_prompt(prompt=prompt, authenticated_bp=authenticated_bp, channel=channel)
-    if not armor_in["allowed"]:
+    # Pre-classify target specialist agent so Model Armor logs both the Router and the target Specialist Agent
+    pre_route = _classify_intent(prompt, authenticated_bp)
+    target_specialist = pre_route["routed_to"]
+
+    # Step 1: Google Cloud Model Armor Input Inspection (Enforced across Supervisor Router + Target Specialist Agent)
+    armor_in = sanitize_user_prompt(
+        prompt=prompt,
+        authenticated_bp=authenticated_bp,
+        channel=channel,
+        target_agent=target_specialist,
+    )
+    agent_guard = enforce_agent_model_armor_guard(
+        agent_name=target_specialist,
+        prompt=prompt,
+        authenticated_bp=authenticated_bp,
+        channel=channel,
+        precomputed_input_armor=armor_in,
+    )
+    if not agent_guard["allowed"]:
         total_ms = round((time.perf_counter() - turn_start) * 1000, 2)
+        short_block = agent_guard.get("short_safe_response", agent_guard["safe_response"])
         return {
-            "reply": armor_in["safe_response"],
+            "reply": agent_guard["safe_response"],
+            "short_reply": short_block,
+            "full_reply": agent_guard["safe_response"],
             "agent_trace": {
                 "router_agent": "GSIS_Concierge_Router (gemini-3.7-flash)",
                 "specialist_agent": "BLOCKED_BY_MODEL_ARMOR",
+                "target_specialist_agent_protected": f"{target_specialist} ({pre_route['model_tier']})",
+                "agents_protected_by_model_armor": ALL_MULTI_AGENT_NAMES,
                 "model_used": "google-cloud-model-armor-v1",
-                "intent": armor_in["threat_category"],
+                "intent": agent_guard["threat_category"],
                 "authenticated_bp": authenticated_bp,
                 "mcp_tools_called": [],
                 "total_latency_ms": total_ms,
             },
-            "model_armor": armor_in,
+            "model_armor": agent_guard,
             "citations": [],
             "phase3_actions": [],
-            "requires_login_modal": armor_in["threat_category"] == "UNAUTHENTICATED_BP_ENUMERATION",
+            "requires_login_modal": agent_guard["threat_category"] == "UNAUTHENTICATED_BP_ENUMERATION",
         }
 
-    clean_prompt = armor_in["sanitized_prompt"]
+    clean_prompt = agent_guard["sanitized_prompt"]
     route = _classify_intent(clean_prompt, authenticated_bp)
     intent = route["intent"]
     specialist_agent = route["routed_to"]
     model_tier = route["model_tier"]
+
+    # Explicitly verify Model Armor guard for the routed Specialist Agent (`GSIS_Policy_FAQ_Agent`,
+    # `GSIS_Member_Records_Agent`, `GSIS_Loans_Computation_Agent`, `GSIS_Benefits_Transactions_Agent`, or `GSIS_Concierge_Router`)
+    specialist_armor_in = enforce_agent_model_armor_guard(
+        agent_name=specialist_agent,
+        prompt=clean_prompt,
+        authenticated_bp=authenticated_bp,
+        channel=channel,
+        precomputed_input_armor=agent_guard,
+    )
 
     mcp_tools_called: List[Dict[str, Any]] = []
     citations: List[Dict[str, Any]] = []
@@ -630,9 +666,17 @@ def run_multi_agent_turn(
             f"💡 *Tip: You can ask me for a **sample MPL Flex or Retirement calculation** by providing a salary (e.g., \"Estimate MPL Flex for PHP 45,000 salary and 15 years of service\"), or click **Member Login (Phase 2)** to inspect your personal GSIS records.*"
         )
 
-    # Step 4: Google Cloud Model Armor Output Inspection (`sanitizeModelResponse`)
-    armor_out = sanitize_model_response(response_text=reply_text, authenticated_bp=authenticated_bp)
-    short_armor_out = sanitize_model_response(response_text=short_reply_text, authenticated_bp=authenticated_bp)
+    # Step 4: Google Cloud Model Armor Output Inspection (`sanitizeModelResponse`) for active Specialist Agent
+    armor_out = sanitize_model_response(
+        response_text=reply_text,
+        authenticated_bp=authenticated_bp,
+        agent_name=specialist_agent,
+    )
+    short_armor_out = sanitize_model_response(
+        response_text=short_reply_text,
+        authenticated_bp=authenticated_bp,
+        agent_name=specialist_agent,
+    )
     total_ms = round((time.perf_counter() - turn_start) * 1000, 2)
 
     return {
@@ -642,6 +686,7 @@ def run_multi_agent_turn(
         "agent_trace": {
             "router_agent": "GSIS_Concierge_Router (gemini-3.7-flash)",
             "specialist_agent": f"{specialist_agent} ({model_tier})",
+            "agents_protected_by_model_armor": ALL_MULTI_AGENT_NAMES,
             "model_used": model_tier,
             "intent": intent,
             "authenticated_bp": authenticated_bp,
@@ -649,8 +694,9 @@ def run_multi_agent_turn(
             "total_latency_ms": total_ms,
         },
         "model_armor": {
-            "input_inspection": armor_in,
+            "input_inspection": specialist_armor_in,
             "output_inspection": armor_out,
+            "enforced_across_agents": ALL_MULTI_AGENT_NAMES,
         },
         "citations": citations,
         "phase3_actions": phase3_actions,

@@ -639,22 +639,25 @@ Following initial deployment to Google Cloud Run (`https://gsis-gabay-ai-demo-jp
      * Displays `short_reply` prominently inside `<div class="short-answer-box">`.
      * Renders an interactive **`🔽 Show Full Details & Computation Breakdown`** toggle button (`<button class="toggle-full-answer-btn">`) that smoothly expands/collapses `<div class="full-answer-collapsible">` (`display: none` $\leftrightarrow$ `display: block`) and updates the button label to **`🔼 Hide Full Details`**.
 
-#### 11.2.5 `SPEC-SEC-01`: Live Google Cloud Model Armor v1 API (`gsis-gabay-armor-v1`) & Cloud DLP SDP Custom InfoTypes
-* **Problem Statement:** To ensure the Executive Demo demonstrates genuine Google Cloud security posture rather than a purely local mock, `demo/backend/model_armor.py` was upgraded to invoke the live **Google Cloud Model Armor v1 Regional API** (`modelarmor.asia-southeast1.rep.googleapis.com`) and **Cloud Sensitive Data Protection (DLP)** templates in `markea-testbed-dev` while retaining all custom GSIS rules and session-bound cross-account isolation checks.
+#### 11.2.5 `SPEC-SEC-01`: Live Google Cloud Model Armor v1 API (`gsis-gabay-armor-v1`), Cloud DLP SDP Custom InfoTypes & All-5-Agents RAI/Crisis Enforcement
+* **Problem Statement:** To ensure the Executive Demo demonstrates genuine Google Cloud security posture across **all 5 agents** in the multi-agent system (`GSIS_Concierge_Router`, `GSIS_Policy_FAQ_Agent`, `GSIS_Member_Records_Agent`, `GSIS_Loans_Computation_Agent`, `GSIS_Benefits_Transactions_Agent`), `demo/backend/model_armor.py` and `demo/backend/multi_agent.py` invoke the live **Google Cloud Model Armor v1 Regional API** (`modelarmor.asia-southeast1.rep.googleapis.com`) and **Cloud Sensitive Data Protection (DLP)** templates in `markea-testbed-dev` while enforcing dedicated Responsible AI (RAI) and crisis shields for **Suicide & Self-Harm (`"I want to die"`, `"I want to die and get my insurance"`)**, **Violence / Killing Someone**, and **Hate Speech / Harassment**.
 * **Provisioned GCP Resources (`markea-testbed-dev`):**
   1. **Cloud DLP Inspect Template (`projects/markea-testbed-dev/locations/asia-southeast1/inspectTemplates/gsis-gabay-sdp-inspect-v1`):**
      * Built-in InfoTypes: `CREDIT_CARD_NUMBER`
-     * Imported Custom Regex InfoTypes:
+     * Imported Custom Regex InfoTypes (auto-synchronized on Cloud Run startup via `sync_gcp_model_armor_and_dlp_templates()`):
        * `PH_TIN_NUMBER`: `\b\d{3}-\d{3}-\d{3}-\d{3}\b` (`VERY_LIKELY`)
        * `GSIS_CRN_NUMBER`: `\b006-\d{4}-\d{4}-\d{1}\b` (`VERY_LIKELY`)
        * `GSIS_ADVERSARIAL_OVERRIDE_OR_SQLI`: `(ignore all previous instructions|system override|developer mode|dan mode|bypass authentication|drop table gsis|union select .* from gsis_members|dump all member records)` (`VERY_LIKELY`)
+       * `GSIS_SUICIDE_AND_SELF_HARM`: `\b(i want to die|want to die|wanna die|kill myself|commit suicide|suicide|suicidal|self[\s\-]?harm|end my life|take my own life|hurt myself|gusto ko nang mamatay|magpakamatay|ayoko na mabuhay)\b` (`VERY_LIKELY`)
+       * `GSIS_VIOLENCE_AND_LETHAL_HARM`: `\b(kill someone|kill a person|murder|assassinate|shoot someone|stab someone|poison someone|make a bomb|plant a bomb|terrorist attack|patayin ko|ipapatay ko)\b` (`VERY_LIKELY`)
+       * `GSIS_HATE_SPEECH_AND_ABUSE`: `\b(subhuman|subhumans|exterminate all|ethnic cleansing|kill yourself|kys|you should die)\b` (`VERY_LIKELY`)
   2. **Cloud DLP De-identify Template (`projects/markea-testbed-dev/locations/asia-southeast1/deidentifyTemplates/gsis-gabay-sdp-deid-v1`):**
      * Replaces matched InfoTypes with `[REDACTED_BY_MODEL_ARMOR_SDP]`.
   3. **Google Cloud Model Armor Template (`projects/markea-testbed-dev/locations/asia-southeast1/templates/gsis-gabay-armor-v1` & `us-central1`):**
      * `piAndJailbreakFilterSettings`: `ENABLED` (`MEDIUM_AND_ABOVE`)
-     * `raiSettings`: `HATE_SPEECH`, `HARASSMENT`, `SEXUALLY_EXPLICIT`, `DANGEROUS` (`MEDIUM_AND_ABOVE`)
+     * `raiSettings`: `HATE_SPEECH`, `HARASSMENT`, `SEXUALLY_EXPLICIT`, `DANGEROUS` (`LOW_AND_ABOVE`)
      * `sdpSettings.advancedConfig`: Linked to `gsis-gabay-sdp-inspect-v1` and `gsis-gabay-sdp-deid-v1`.
-  4. **Hybrid Runtime Enforcement (`demo/backend/model_armor.py`):**
-     * Calls `POST https://modelarmor.asia-southeast1.rep.googleapis.com/v1/projects/markea-testbed-dev/locations/asia-southeast1/templates/gsis-gabay-armor-v1:sanitizeUserPrompt` and `:sanitizeModelResponse` on every chat turn.
-     * Combines live GCP Model Armor verdicts (`pi_and_jailbreak`, `sdp`, `rai`) with session-bound `BP_NUMBER_REGEX` horizontal privilege escalation checks (`UNAUTHENTICATED_BP_ENUMERATION` and `CROSS_ACCOUNT_BP_SPOOFING_ATTEMPT`) and returns live `gcp_model_armor_api` telemetry in the API payload.
+  4. **All-5-Agents Runtime Enforcement (`enforce_agent_model_armor_guard` in `demo/backend/model_armor.py` & `demo/backend/multi_agent.py`):**
+     * Enforces both input (`sanitizeUserPrompt`) and output (`sanitizeModelResponse`) Model Armor guards across all 5 agents (`GSIS_Concierge_Router`, `GSIS_Policy_FAQ_Agent`, `GSIS_Member_Records_Agent`, `GSIS_Loans_Computation_Agent`, `GSIS_Benefits_Transactions_Agent`).
+     * Categorizes blocked requests into explicit threat shields: `SELF_HARM_AND_SUICIDE_SHIELD` (providing 24/7 Philippine NCMH Crisis Hotline `1553` / `0917-899-8727`), `VIOLENCE_AND_LETHAL_HARM_SHIELD`, `HATE_SPEECH_AND_HARASSMENT_SHIELD`, `PROMPT_INJECTION_AND_JAILBREAK_SHIELD`, `UNAUTHENTICATED_BP_ENUMERATION`, and `CROSS_ACCOUNT_BP_SPOOFING_ATTEMPT`.
 

@@ -99,6 +99,9 @@ app.add_middleware(
 def on_startup():
     init_database()
     seed_preseeded_personas()
+    import threading
+    from backend.model_armor import sync_gcp_model_armor_and_dlp_templates
+    threading.Thread(target=sync_gcp_model_armor_and_dlp_templates, daemon=True).start()
 
 
 class LoginRequest(BaseModel):
