@@ -178,49 +178,51 @@ def sync_gcp_model_armor_and_dlp_templates() -> Dict[str, Any]:
             "inspectTemplates/gsis-gabay-sdp-inspect-v1?updateMask=inspectConfig"
         )
         dlp_payload = {
-            "inspectConfig": {
-                "infoTypes": [{"name": "CREDIT_CARD_NUMBER"}],
-                "customInfoTypes": [
-                    {
-                        "infoType": {"name": "PH_TIN_NUMBER"},
-                        "regex": {"pattern": r"\b\d{3}-\d{3}-\d{3}-\d{3}\b"},
-                        "likelihood": "VERY_LIKELY",
-                    },
-                    {
-                        "infoType": {"name": "GSIS_CRN_NUMBER"},
-                        "regex": {"pattern": r"\b006-\d{4}-\d{4}-\d{1}\b"},
-                        "likelihood": "VERY_LIKELY",
-                    },
-                    {
-                        "infoType": {"name": "GSIS_ADVERSARIAL_OVERRIDE_OR_SQLI"},
-                        "regex": {
-                            "pattern": r"(?i)(ignore all previous instructions|system override|developer mode|dan mode|bypass authentication|drop table gsis|union select .* from gsis_members|dump all member records)"
+            "inspectTemplate": {
+                "inspectConfig": {
+                    "infoTypes": [{"name": "CREDIT_CARD_NUMBER"}],
+                    "customInfoTypes": [
+                        {
+                            "infoType": {"name": "PH_TIN_NUMBER"},
+                            "regex": {"pattern": r"\b\d{3}-\d{3}-\d{3}-\d{3}\b"},
+                            "likelihood": "VERY_LIKELY",
                         },
-                        "likelihood": "VERY_LIKELY",
-                    },
-                    {
-                        "infoType": {"name": "GSIS_SUICIDE_AND_SELF_HARM"},
-                        "regex": {
-                            "pattern": r"(?i)\b(i want to die|want to die|wanna die|kill myself|commit suicide|suicide|suicidal|self[\s\-]?harm|end my life|take my own life|hurt myself|gusto ko nang mamatay|magpakamatay|ayoko na mabuhay)\b"
+                        {
+                            "infoType": {"name": "GSIS_CRN_NUMBER"},
+                            "regex": {"pattern": r"\b006-\d{4}-\d{4}-\d{1}\b"},
+                            "likelihood": "VERY_LIKELY",
                         },
-                        "likelihood": "VERY_LIKELY",
-                    },
-                    {
-                        "infoType": {"name": "GSIS_VIOLENCE_AND_LETHAL_HARM"},
-                        "regex": {
-                            "pattern": r"(?i)\b(kill someone|kill a person|murder|assassinate|shoot someone|stab someone|poison someone|make a bomb|plant a bomb|terrorist attack|patayin ko|ipapatay ko)\b"
+                        {
+                            "infoType": {"name": "GSIS_ADVERSARIAL_OVERRIDE_OR_SQLI"},
+                            "regex": {
+                                "pattern": r"(?i)(ignore all previous instructions|system override|developer mode|dan mode|bypass authentication|drop table gsis|union select .* from gsis_members|dump all member records)"
+                            },
+                            "likelihood": "VERY_LIKELY",
                         },
-                        "likelihood": "VERY_LIKELY",
-                    },
-                    {
-                        "infoType": {"name": "GSIS_HATE_SPEECH_AND_ABUSE"},
-                        "regex": {
-                            "pattern": r"(?i)\b(subhuman|subhumans|exterminate all|ethnic cleansing|kill yourself|kys|you should die)\b"
+                        {
+                            "infoType": {"name": "GSIS_SUICIDE_AND_SELF_HARM"},
+                            "regex": {
+                                "pattern": r"(?i)(i want to die|want to die|wanna die|kill myself|commit suicide|suicide|suicidal|self-harm|self harm|end my life|take my own life|hurt myself|gusto ko nang mamatay|magpakamatay|ayoko na mabuhay)"
+                            },
+                            "likelihood": "VERY_LIKELY",
                         },
-                        "likelihood": "VERY_LIKELY",
-                    },
-                ],
-                "includeQuote": True,
+                        {
+                            "infoType": {"name": "GSIS_VIOLENCE_AND_LETHAL_HARM"},
+                            "regex": {
+                                "pattern": r"(?i)(kill someone|kill a person|murder|assassinate|shoot someone|stab someone|poison someone|make a bomb|plant a bomb|terrorist attack|patayin ko|ipapatay ko)"
+                            },
+                            "likelihood": "VERY_LIKELY",
+                        },
+                        {
+                            "infoType": {"name": "GSIS_HATE_SPEECH_AND_ABUSE"},
+                            "regex": {
+                                "pattern": r"(?i)(subhuman|subhumans|exterminate all|ethnic cleansing|kill yourself|kys|you should die)"
+                            },
+                            "likelihood": "VERY_LIKELY",
+                        },
+                    ],
+                    "includeQuote": True,
+                }
             }
         }
         r_dlp = _http_session.patch(dlp_url, headers=headers, json=dlp_payload, timeout=5.0)
@@ -422,61 +424,25 @@ def sanitize_user_prompt(
             ),
         }
 
-    # 2. Check Violence, Killing Someone & Lethal Harm Shield
-    regex_violence = any(
-        re.search(pattern, lower_prompt, re.IGNORECASE)
-        for pattern in VIOLENCE_LETHAL_HARM_PATTERNS
-    )
-    gcp_dangerous = (
-        "GSIS_VIOLENCE_AND_LETHAL_HARM" in sdp_info_types
-        or rai_type_results.get("dangerous", {}).get("matchState") == "MATCH_FOUND"
-    )
-
-    if regex_violence or gcp_dangerous:
-        latency_ms = round((time.perf_counter() - start_ts) * 1000, 2)
-        matched_filters_str = ", ".join(
-            gcp_api_telemetry.get("matched_filters")
-            or ["VIOLENCE_AND_LETHAL_HARM_SHIELD", "rai [DANGEROUS]"]
-        )
-        return {
-            "allowed": False,
-            "action": "BLOCKED_BY_MODEL_ARMOR",
-            "threat_category": "VIOLENCE_AND_LETHAL_HARM_SHIELD",
-            "rai_classification": "VIOLENCE_OR_KILLING_SOMEONE",
-            "severity": "CRITICAL",
-            "policy_template": MODEL_ARMOR_TEMPLATE_ID,
-            "enforced_across_agents": ALL_MULTI_AGENT_NAMES,
-            "target_agent_blocked": target_agent,
-            "latency_ms": latency_ms,
-            "gcp_model_armor_api": gcp_api_telemetry,
-            "reason": (
-                "Google Cloud Model Armor blocked this request: Detected violent threat, killing someone, or "
-                f"dangerous harm content (`sanitizeUserPrompt: MATCH_FOUND` [VIOLENCE_AND_LETHAL_HARM_SHIELD | {matched_filters_str}])."
-            ),
-            "short_safe_response": (
-                "🛡️ **Blocked by Google Cloud Model Armor (`VIOLENCE_AND_LETHAL_HARM_SHIELD`)** — "
-                "This request was blocked because it references **violence, killing someone, or dangerous physical harm**."
-            ),
-            "safe_response": (
-                "🛡️ **Google Cloud Model Armor Responsible AI Security Alert (`VIOLENCE_AND_LETHAL_HARM_SHIELD`)**\n\n"
-                "Your request was blocked across **all 5 GSIS Gabay AI Agents** by the **Google Cloud Model Armor Responsible AI (`DANGEROUS` / Violence) Filter**.\n\n"
-                f"- **Policy Enforced**: `{MODEL_ARMOR_TEMPLATE_ID.split('/')[-1]}` (`VIOLENCE_AND_LETHAL_HARM_SHIELD` | `{matched_filters_str}`)\n"
-                f"- **Agents Protected**: `GSIS_Concierge_Router`, `GSIS_Policy_FAQ_Agent`, `GSIS_Member_Records_Agent`, `GSIS_Loans_Computation_Agent`, `GSIS_Benefits_Transactions_Agent`\n"
-                f"- **Engine**: `{gcp_api_telemetry.get('api_mode', 'LIVE_GCP_MODEL_ARMOR_V1')}`\n"
-                "- **Action**: `BLOCK_AND_LOG`"
-            ),
-        }
-
-    # 3. Check Hate Speech, Harassment & Sexually Explicit RAI Shield
+    # 2. Check Hate Speech, Harassment & Sexually Explicit RAI Shield (when explicit Hate Speech / Abuse is matched)
     regex_hate = any(
         re.search(pattern, lower_prompt, re.IGNORECASE)
         for pattern in HATE_SPEECH_HARASSMENT_PATTERNS
     )
+    regex_violence = any(
+        re.search(pattern, lower_prompt, re.IGNORECASE)
+        for pattern in VIOLENCE_LETHAL_HARM_PATTERNS
+    )
     gcp_hate_or_harassment = (
         "GSIS_HATE_SPEECH_AND_ABUSE" in sdp_info_types
-        or rai_type_results.get("hate_speech", {}).get("matchState") == "MATCH_FOUND"
-        or rai_type_results.get("harassment", {}).get("matchState") == "MATCH_FOUND"
-        or rai_type_results.get("sexually_explicit", {}).get("matchState") == "MATCH_FOUND"
+        or (
+            not regex_violence
+            and (
+                rai_type_results.get("hate_speech", {}).get("confidenceLevel") in ("MEDIUM_AND_ABOVE", "HIGH")
+                or rai_type_results.get("harassment", {}).get("confidenceLevel") in ("MEDIUM_AND_ABOVE", "HIGH")
+                or rai_type_results.get("sexually_explicit", {}).get("confidenceLevel") in ("MEDIUM_AND_ABOVE", "HIGH")
+            )
+        )
     )
 
     if regex_hate or gcp_hate_or_harassment:
@@ -514,6 +480,47 @@ def sanitize_user_prompt(
             ),
         }
 
+    # 3. Check Violence, Killing Someone & Lethal Harm Shield
+    gcp_dangerous = (
+        "GSIS_VIOLENCE_AND_LETHAL_HARM" in sdp_info_types
+        or rai_type_results.get("dangerous", {}).get("confidenceLevel") in ("MEDIUM_AND_ABOVE", "HIGH")
+    )
+
+    if regex_violence or gcp_dangerous:
+        latency_ms = round((time.perf_counter() - start_ts) * 1000, 2)
+        matched_filters_str = ", ".join(
+            gcp_api_telemetry.get("matched_filters")
+            or ["VIOLENCE_AND_LETHAL_HARM_SHIELD", "rai [DANGEROUS]"]
+        )
+        return {
+            "allowed": False,
+            "action": "BLOCKED_BY_MODEL_ARMOR",
+            "threat_category": "VIOLENCE_AND_LETHAL_HARM_SHIELD",
+            "rai_classification": "VIOLENCE_OR_KILLING_SOMEONE",
+            "severity": "CRITICAL",
+            "policy_template": MODEL_ARMOR_TEMPLATE_ID,
+            "enforced_across_agents": ALL_MULTI_AGENT_NAMES,
+            "target_agent_blocked": target_agent,
+            "latency_ms": latency_ms,
+            "gcp_model_armor_api": gcp_api_telemetry,
+            "reason": (
+                "Google Cloud Model Armor blocked this request: Detected violent threat, killing someone, or "
+                f"dangerous harm content (`sanitizeUserPrompt: MATCH_FOUND` [VIOLENCE_AND_LETHAL_HARM_SHIELD | {matched_filters_str}])."
+            ),
+            "short_safe_response": (
+                "🛡️ **Blocked by Google Cloud Model Armor (`VIOLENCE_AND_LETHAL_HARM_SHIELD`)** — "
+                "This request was blocked because it references **violence, killing someone, or dangerous physical harm**."
+            ),
+            "safe_response": (
+                "🛡️ **Google Cloud Model Armor Responsible AI Security Alert (`VIOLENCE_AND_LETHAL_HARM_SHIELD`)**\n\n"
+                "Your request was blocked across **all 5 GSIS Gabay AI Agents** by the **Google Cloud Model Armor Responsible AI (`DANGEROUS` / Violence) Filter**.\n\n"
+                f"- **Policy Enforced**: `{MODEL_ARMOR_TEMPLATE_ID.split('/')[-1]}` (`VIOLENCE_AND_LETHAL_HARM_SHIELD` | `{matched_filters_str}`)\n"
+                f"- **Agents Protected**: `GSIS_Concierge_Router`, `GSIS_Policy_FAQ_Agent`, `GSIS_Member_Records_Agent`, `GSIS_Loans_Computation_Agent`, `GSIS_Benefits_Transactions_Agent`\n"
+                f"- **Engine**: `{gcp_api_telemetry.get('api_mode', 'LIVE_GCP_MODEL_ARMOR_V1')}`\n"
+                "- **Action**: `BLOCK_AND_LOG`"
+            ),
+        }
+
     # 4. Check Prompt Injection / Jailbreak / SQLi via both Live GCP Model Armor API and Deterministic Rules
     regex_pi_matched = any(
         re.search(pattern, lower_prompt, re.IGNORECASE)
@@ -525,7 +532,6 @@ def sanitize_user_prompt(
             and gcp_api_telemetry.get("pi_confidence") in ("MEDIUM_AND_ABOVE", "HIGH")
         )
         or "GSIS_ADVERSARIAL_OVERRIDE_OR_SQLI" in sdp_info_types
-        or gcp_api_telemetry.get("rai_match_state") == "MATCH_FOUND"
     )
 
     if regex_pi_matched or gcp_pi_matched:
