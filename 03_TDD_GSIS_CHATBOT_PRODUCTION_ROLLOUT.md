@@ -307,3 +307,25 @@ To ensure zero disruption to the live Phase 1 and Phase 2 services on `gsis.gov.
 2. **Stage 3B — Native Playbook Consolidation in CX Agent Studio (`Weeks 15–18`):**
    * Gradually migrate the routing logic from `GSIS_Concierge_Router` into CX Agent Studio's visual low-code Playbook hierarchy so GSIS business analysts and contact center supervisors can tune escalation thresholds, voice prompts, and Next-Best-Action rules visually while continuing to invoke the exact same deterministic Python/SAP MCP tools underneath.
 
+---
+
+## 12. Per-Phase GCP Infrastructure & FinOps Bill of Materials (`asia-southeast1`)
+
+*(Full line-item formulas and unit pricing schedule documented in [`04_GCP_COSTING_ESTIMATE_GSIS_GABAY_AI.md`](file:///usr/local/google/home/markea/Desktop/gsis-chatbot-26/04_GCP_COSTING_ESTIMATE_GSIS_GABAY_AI.md).)*
+
+### 12.1 Production Capacity & Token Sizing (`200,000` Daily Visitors)
+- **Scenario A (5% Engagement)**: `10,000` daily sessions (`300,000` monthly sessions; `1,200,000` turns/mo; `2.40B` input tokens [70% Context Cached] + `480M` output tokens/mo).
+- **Scenario B (10% Engagement)**: `20,000` daily sessions (`600,000` monthly sessions; `2,400,000` turns/mo; `4.80B` input tokens [70% Context Cached] + `960M` output tokens/mo).
+
+### 12.2 Monthly GCP Bill of Materials by Phase (`USD $` & `PHP ₱` @ `₱56.50/$1`)
+| Architecture Layer / Service | Phase 1: Public FAQ RAG<br>(5% / 10% Band) | Phase 2: Authenticated ADK + MCP<br>(5% / 10% Band) | Phase 3: Omnichannel GECX + Voice<br>(5% / 10% Band) |
+| :--- | :--- | :--- | :--- |
+| **Vertex AI / GECX Conversational Runtime** | • **Value (`Gemini 2.5 Flash`)**: `$1,474` / `$2,948`<br>• **Flagship (`Gemini 3.7 Flash`)**: `$4,940` / `$9,879` | • **Value (`70% 2.5 Flash + 30% 2.5 Pro`)**: `$2,799` / `$5,599`<br>• **Flagship (`3.7 Flash + 3.1 Pro`)**: `$5,713` / `$11,427` | • **GECX Chat Playbooks (80%)**: `$11,520` / `$23,040`<br>• **GECX Voice `8847-4747` (20%)**: `$16,200` / `$32,400`<br>• **Live Agent Assist (10%)**: `$1,080` / `$2,160` |
+| **Google Cloud Model Armor + Cloud DLP (`sdpSettings`)** | `$1,352` / `$2,707`<br>*(User Prompt + Response Inspection)* | `$1,812` / `$3,624`<br>*(User + MCP Tool Args + Response)* | `$1,812` / `$3,624`<br>*(Omnichannel Text + Voice Transcripts)* |
+| **AlloyDB for PostgreSQL (`asia-southeast1` 1Y CUD)** | `$423 / mo`<br>*(1x `4vCPU/32GB` HA Primary + `100GB` SSD)* | `$866 / mo`<br>*(HA Primary + `4vCPU/32GB` Read Pool + `250GB`)* | `$866 / mo`<br>*(HA Primary + Read Pool + `250GB` SSD)* |
+| **Memorystore for Redis (`5 GiB` Standard HA)** | *N/A (Stateless Public FAQ)* | `$212 / mo` *(1Y CUD)* | `$212 / mo` *(1Y CUD)* |
+| **Cloud Run + Cloud Load Balancing + Cloud Armor WAF** | `$169` / `$258` | `$315` / `$485` | `$750` / `$1,120` *(+ SIP/Telephony Gateway)* |
+| **Cloud Logging, Monitoring, OTel & BigQuery Export** | `$40` / `$75` | `$95` / `$165` | `$450` / `$758` |
+| **TOTAL MONTHLY GCP RUN-RATE (Value Tier)** | **$3,458 / $6,411**<br>*(₱195,377 / ₱362,222)* | **$6,099 / $10,948**<br>*(₱344,594 / ₱618,562)* | **$32,890 / $64,180**<br>*(₱1,858,285 / ₱3,626,170)* |
+| **TOTAL MONTHLY GCP RUN-RATE (Flagship Tier)** | **$6,924 / $13,342**<br>*(₱391,206 / ₱753,823)* | **$9,013 / $16,779**<br>*(₱509,235 / ₱948,014)* | **$32,890 / $64,180**<br>*(₱1,858,285 / ₱3,626,170)* |
+

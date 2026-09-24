@@ -463,3 +463,23 @@ The table below defines the standard executive demonstration flow for GSIS leade
    * **Stage 3A (GECX Wrapper & Voice/Live Agent Activation):** Connect the existing Phase 2 MCP Server and ADK endpoints to **[GECX (CX Agent Studio)](https://cloud.google.com/gemini-enterprise-cx?e=48754805)** via **Action Connectors** to immediately unlock the **GECX Omnichannel Gateway (WhatsApp, SMS, `8847-4747` Voice SIP)**, **Composite Audio-to-Audio Taglish Voice**, and **Warm Human Agent Escalation (`Agent Assist`)** with zero backend code rewrites.
    * **Stage 3B (CX Agent Studio Visual Playbook Migration & Transactional Execution):** Incrementally migrate the `GSIS_Concierge_Router` and 4 Specialist Sub-Agent flows into CX Agent Studio's visual low-code Playbook hierarchy and activate step-up authenticated SAP write transactions (1-tap MPL Flex loan application, APIR schedule booking, and automated ERF reconciliation ticketing).
 
+---
+
+## 13. Per-Phase Google Cloud Platform (GCP) Costing & FinOps Summary
+
+*(For the complete line-item Bill of Materials and unit pricing math, see [`04_GCP_COSTING_ESTIMATE_GSIS_GABAY_AI.md`](file:///usr/local/google/home/markea/Desktop/gsis-chatbot-26/04_GCP_COSTING_ESTIMATE_GSIS_GABAY_AI.md).)*
+
+### 13.1 Traffic Sizing Basis
+- **Daily Visitors (`gsis.gov.ph` + `GSIS Touch` App)**: **200,000 visitors/day** (`6,000,000` visits/month).
+- **Low Engagement Band (5% Daily Conversion)**: **10,000 sessions/day** (`300,000` sessions/month; `1,200,000` turns/month at 4 turns/session).
+- **High Engagement Band (10% Daily Conversion)**: **20,000 sessions/day** (`600,000` sessions/month; `2,400,000` turns/month at 4 turns/session).
+- **FinOps Optimizations Applied**: `70%` Vertex AI Context Caching (`90%` input token discount on GSIS policy circulars & system prompts), `70% Flash / 30% Pro` tiered model routing, selective Model Armor user/response payload inspection, and 1-Year CUDs on AlloyDB (`asia-southeast1`).
+
+### 13.2 Per-Phase Monthly GCP Investment Table (`USD $` & `PHP ₱` @ `₱56.50/$1`)
+| Roadmap Phase | Core GCP Services & Model Stack | 5% Band (`10,000` sessions/day)<br>Monthly Cost (USD / PHP) | 10% Band (`20,000` sessions/day)<br>Monthly Cost (USD / PHP) | Effective Cost per Session |
+| :--- | :--- | :--- | :--- | :--- |
+| **Phase 0: Executive Demo** *(Live Prototype)* | Cloud Run (`gsis-gabay-ai-demo`), SQLite Mock Core, `Gemini 3.7 Flash` + `3.1 Pro`, Live GCP Model Armor (`gsis-gabay-armor-v1`) | **$38 – $85 / mo**<br>*(₱2,147 – ₱4,802 / mo)* | *N/A (Executive Testing)* | `~$0.015 / session` |
+| **Phase 1: Public FAQ & Policy RAG Assistant** *(Months 1–2)* | 100% Flash RAG (`Gemini 2.5 Flash` Value Tier or `Gemini 3.7 Flash` Flagship), Model Armor + Cloud DLP, AlloyDB HA (`pgvector`), Cloud Run, Cloud Armor WAF | **Value (`2.5 Flash`):** **$3,458 – $4,296 / mo** *(₱195k – ₱243k)*<br>**Flagship (`3.7 Flash`):** **$6,924 – $9,912 / mo** *(₱391k – ₱560k)* | **Value (`2.5 Flash`):** **$6,411 – $7,952 / mo** *(₱362k – ₱449k)*<br>**Flagship (`3.7 Flash`):** **$13,342 – $19,184 / mo** *(₱754k – ₱1.08M)* | **$0.011 – $0.033**<br>*(₱0.65 – ₱1.86)* |
+| **Phase 2: Authenticated Member Self-Service** *(Months 3–4)* | 70% Flash + 30% Pro (`Gemini 3.7 Flash` + `3.1 Pro` or `2.5` equivalents), Cloud Run MCP Server, AlloyDB HA + Read Pool, Memorystore Redis, Model Armor | **Value (`2.5` Stack):** **$6,099 – $6,890 / mo** *(₱345k – ₱389k)*<br>**Flagship (`3.7/3.1`):** **$9,013 – $12,340 / mo** *(₱509k – ₱697k)* | **Value (`2.5` Stack):** **$10,948 – $12,310 / mo** *(₱619k – ₱696k)*<br>**Flagship (`3.7/3.1`):** **$16,779 – $23,210 / mo** *(₱948k – ₱1.31M)* | **$0.018 – $0.039**<br>*(₱1.03 – ₱2.19)* |
+| **Phase 3: Omnichannel GECX (Voice `8847-4747` + Web/App Chat + Live Agent Assist)** *(Months 5–6)* | **CX Agent Studio Playbooks** (`80%` Digital Chat @ `$0.012/turn` + `20%` Voice AI `8847-4747` @ `$0.12/min` + `10%` Warm Human Escalation w/ Agent Assist) + Phase 2 Backend | **$32,890 / mo**<br>*(₱1,858,285 / mo)* | **$64,180 / mo**<br>*(₱3,626,170 / mo)* | **$0.107 – $0.109**<br>*(₱6.05 – ₱6.19 blended Chat + Voice + Human)* |
+
